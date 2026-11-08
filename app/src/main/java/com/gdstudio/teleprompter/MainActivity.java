@@ -11,10 +11,8 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.SeekBar;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
@@ -26,9 +24,6 @@ public class MainActivity extends Activity {
     static final String K_MIRROR = "mirror";
 
     private EditText script;
-    private SeekBar fontBar, speedBar;
-    private TextView fontLabel, speedLabel;
-    private CheckBox mirror;
     private SharedPreferences prefs;
 
     private int dp(int v) {
@@ -72,24 +67,6 @@ public class MainActivity extends Activity {
         root.addView(script, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        fontLabel = label(root);
-        fontBar = new SeekBar(this);
-        fontBar.setMax(80); // 20..100 sp
-        fontBar.setProgress(prefs.getInt(K_FONT, 42) - 20);
-        root.addView(fontBar);
-
-        speedLabel = label(root);
-        speedBar = new SeekBar(this);
-        speedBar.setMax(19); // 1..20
-        speedBar.setProgress(prefs.getInt(K_SPEED, 5) - 1);
-        root.addView(speedBar);
-
-        mirror = new CheckBox(this);
-        mirror.setText("Mirror (glass teleprompter er jonno ulta lekha)");
-        mirror.setTextColor(Color.WHITE);
-        mirror.setChecked(prefs.getBoolean(K_MIRROR, false));
-        root.addView(mirror);
-
         Button start = new Button(this);
         start.setText("START");
         start.setTextSize(18);
@@ -104,20 +81,12 @@ public class MainActivity extends Activity {
         TextView keys = new TextView(this);
         keys.setText("Remote: Play/Pause = Volume Up / Space / Enter / OK\n"
                 + "Pichone = Volume Down / Page Up / Up   •   Samne = Page Down / Down\n"
-                + "Speed: Right = beshi, Left = kom   •   Screen tap = Play/Pause");
+                + "Speed: Right = beshi, Left = kom   •   Screen tap = Play/Pause\n"
+                + "Font, colour, spacing, mirror, speed — shob ⚙ button e (prompter screen)");
         keys.setTextColor(Color.rgb(140, 146, 166));
         keys.setTextSize(11);
         keys.setPadding(0, dp(8), 0, 0);
         root.addView(keys);
-
-        SeekBar.OnSeekBarChangeListener l = new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar s, int p, boolean u) { updateLabels(); }
-            public void onStartTrackingTouch(SeekBar s) {}
-            public void onStopTrackingTouch(SeekBar s) {}
-        };
-        fontBar.setOnSeekBarChangeListener(l);
-        speedBar.setOnSeekBarChangeListener(l);
-        updateLabels();
 
         start.setOnClickListener(v -> {
             save();
@@ -127,33 +96,17 @@ public class MainActivity extends Activity {
         setContentView(root);
     }
 
-    private TextView label(LinearLayout root) {
-        TextView t = new TextView(this);
-        t.setTextColor(Color.WHITE);
-        t.setPadding(0, dp(12), 0, 0);
-        root.addView(t);
-        return t;
-    }
-
-    private void updateLabels() {
-        fontLabel.setText("Font size: " + (fontBar.getProgress() + 20));
-        speedLabel.setText("Speed: " + (speedBar.getProgress() + 1));
-    }
-
     private void save() {
         prefs.edit()
                 .putString(K_SCRIPT, script.getText().toString())
-                .putInt(K_FONT, fontBar.getProgress() + 20)
-                .putInt(K_SPEED, speedBar.getProgress() + 1)
-                .putBoolean(K_MIRROR, mirror.isChecked())
                 .apply();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        // speed may have been changed with the remote during prompting
-        speedBar.setProgress(prefs.getInt(K_SPEED, 5) - 1);
+        // script may have been edited inside the prompter
+        script.setText(prefs.getString(K_SCRIPT, ""));
     }
 
     @Override
