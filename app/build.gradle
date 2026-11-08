@@ -10,11 +10,23 @@ android {
         applicationId 'com.gdstudio.teleprompter'
         minSdk 21
         targetSdk 34
-        versionCode 1
-        versionName '1.0'
+        versionCode 2
+        versionName '2.0'
+    }
+
+    signingConfigs {
+        gd {
+            storeFile file('gd-debug.keystore')
+            storePassword 'android'
+            keyAlias 'gddebug'
+            keyPassword 'android'
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.gd
+        }
         release {
             minifyEnabled false
         }
