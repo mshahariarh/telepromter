@@ -52,13 +52,13 @@ public class Importer {
         if (low.endsWith(".docx") || mime.contains("wordprocessingml")) r.text = docx(c, u);
         else if (low.endsWith(".pdf") || mime.equals("application/pdf")) r.text = pdf(c, u);
         else r.text = txt(c, u);
-        if (r.text == null || r.text.trim().isEmpty()) throw new IOException("File e kono lekha paoa jayni");
+        if (r.text == null || r.text.trim().isEmpty()) throw new IOException("No text found in this file");
         return r;
     }
 
     static byte[] bytes(Context c, Uri u) throws IOException {
         try (InputStream in = c.getContentResolver().openInputStream(u)) {
-            if (in == null) throw new IOException("File khola jacche na");
+            if (in == null) throw new IOException("Could not open the file");
             ByteArrayOutputStream o = new ByteArrayOutputStream();
             byte[] b = new byte[8192];
             int k;
@@ -86,7 +86,7 @@ public class Importer {
                 }
             }
         }
-        throw new IOException("Word file e lekha paoa jayni");
+        throw new IOException("No text found in this Word file");
     }
 
     static String docxText(String xml) {

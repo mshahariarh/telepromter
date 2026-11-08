@@ -16,9 +16,9 @@ public class Keys {
             TOP = 7, FONT_UP = 8, FONT_DN = 9, MIRROR = 10, LOOP = 11;
     /** last action that can be learned in "Button set" */
     static final int LAST = LOOP;
-    static final String[] NAMES = {"", "Play / Pause", "Pichone (back)", "Samne (forward)",
-            "Speed +", "Speed −", "Exit (prompter bondho)", "Shurute jao", "Font boro",
-            "Font choto", "Mirror on/off", "Loop on/off"};
+    static final String[] NAMES = {"", "Play / Pause", "Scroll back", "Scroll forward",
+            "Speed +", "Speed −", "Exit prompter", "Go to start", "Font bigger",
+            "Font smaller", "Mirror on/off", "Loop on/off"};
 
     static int actionFor(Context c, int keyCode) {
         SharedPreferences p = Store.prefs(c);

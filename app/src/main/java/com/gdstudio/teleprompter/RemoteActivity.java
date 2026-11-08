@@ -84,20 +84,20 @@ public class RemoteActivity extends Activity
         bleStatus.setTextSize(15);
         bleStatus.setTypeface(Typeface.DEFAULT_BOLD);
         c0.addView(bleStatus);
-        TextView scan = button("🔍  Remote khujun o connect korun", Color.rgb(255, 196, 0), Color.BLACK);
+        TextView scan = button("🔍  Find & connect remote", Color.rgb(255, 196, 0), Color.BLACK);
         scan.setOnClickListener(v -> startScanFlow());
         c0.addView(scan);
-        TextView forget = button("Remote bad din (forget)", Color.rgb(230, 230, 230), Color.BLACK);
+        TextView forget = button("Forget remote", Color.rgb(230, 230, 230), Color.BLACK);
         forget.setOnClickListener(v -> ble.forget());
         c0.addView(forget);
-        c0.addView(note("1. Remote on korun (LED jolbe)\n"
-                + "2. Upore holud button chapun → list theke \"Feelworld-…\" tap korun\n"
-                + "3. Niche \"Button set\" e protita button 1 bar set korun\n\n"
-                + "Phone er Bluetooth settings e pair korar dorkar nei. Ekbar korle porer bar "
-                + "app khullei remote nije nije connect hobe, kete gele abar connect hobe."));
+        c0.addView(note("1. Turn the remote on (LED lights up)\n"
+                + "2. Tap the yellow button above → choose \"Feelworld-…\" from the list\n"
+                + "3. Set each button once under \"Button set\" below\n\n"
+                + "No need to pair in phone Bluetooth settings. After the first time, "
+                + "the remote connects automatically when the app opens and reconnects if it drops."));
 
         // 2. Normal Bluetooth remotes / clickers
-        LinearLayout c1 = card(box, "Onno remote / clicker (keyboard type)");
+        LinearLayout c1 = card(box, "Other remotes / clickers (keyboard type)");
         devList = new LinearLayout(this);
         devList.setOrientation(LinearLayout.VERTICAL);
         c1.addView(devList);
@@ -109,10 +109,10 @@ public class RemoteActivity extends Activity
             }
         });
         c1.addView(pair);
-        c1.addView(note("Selfie remote, presentation clicker, keyboard — egulo phone settings e pair hoy."));
+        c1.addView(note("Selfie remotes, presentation clickers and keyboards are paired in phone settings."));
 
         // Phone as remote (WiFi)
-        LinearLayout cw = card(box, "📱 Arekta phone ke remote banan (WiFi)");
+        LinearLayout cw = card(box, "📱 Use another phone as remote (WiFi)");
         wifiTv = new TextView(this);
         wifiTv.setTextSize(15);
         wifiTv.setTextColor(Color.BLACK);
@@ -129,13 +129,13 @@ public class RemoteActivity extends Activity
             wifiTv.postDelayed(this::refreshWifi, 500);
         });
         cw.addView(wifiBtn);
-        cw.addView(note("Duto phone ek WiFi te rakhun (ba ek phone er hotspot e arekta connect korun). "
-                + "Arekta phone e QR scan korun ba link ta browser e khulun — sekhan theke play, speed, "
-                + "font control korte parben. Teleprompter phone e script khula rakhun."));
+        cw.addView(note("Keep both phones on the same WiFi (or connect one to the other's hotspot). "
+                + "Scan the QR code or open the link in the other phone's browser to control play, speed "
+                + "and font. Keep the script open on the teleprompter phone."));
 
         LinearLayout cd = card(box, "Shortcut");
         android.widget.CheckBox dbl = new android.widget.CheckBox(this);
-        dbl.setText("Play button 2 bar taratari chaple → shurute jabe");
+        dbl.setText("Double-press Play → go back to start");
         dbl.setTextColor(Color.BLACK);
         dbl.setChecked(Store.prefs(this).getBoolean("dbl_top", false));
         dbl.setOnCheckedChangeListener((b, c) -> Store.prefs(this).edit().putBoolean("dbl_top", c).apply());
@@ -144,7 +144,7 @@ public class RemoteActivity extends Activity
         // 3. Test
         LinearLayout c2 = card(box, "Remote test");
         testTv = new TextView(this);
-        testTv.setText("Remote er je kono button chapun…");
+        testTv.setText("Press any button on the remote…");
         testTv.setTextSize(18);
         testTv.setTextColor(Color.BLACK);
         testTv.setGravity(Gravity.CENTER);
@@ -157,7 +157,7 @@ public class RemoteActivity extends Activity
 
         // 4. Learn buttons
         LinearLayout c3 = card(box, "Button set");
-        c3.addView(note("\"Set\" chepe remote er je button (OK, Select, Back, arrow…) ei kaj korbe sheta chapun. Ekbar korlei mone thakbe."));
+        c3.addView(note("Tap \"Set\", then press the remote button (OK, Select, Back, arrow…) you want for that action. It is remembered."));
         for (int a = Keys.PLAY; a <= Keys.LAST; a++) {
             final int action = a;
             LinearLayout r = new LinearLayout(this);
@@ -175,18 +175,18 @@ public class RemoteActivity extends Activity
             TextView set = button("Set", Color.BLACK, Color.WHITE);
             set.setOnClickListener(v -> {
                 learning = action;
-                testTv.setText("Ekhon remote e \"" + Keys.NAMES[action] + "\" er button chapun…");
+                testTv.setText("Now press the remote button for \"" + Keys.NAMES[action] + "\"…");
                 refreshLabels();
             });
             r.addView(set, new LinearLayout.LayoutParams(dp(64), dp(38)));
             c3.addView(r);
         }
-        TextView reset = button("Default e firun", Color.rgb(230, 230, 230), Color.BLACK);
+        TextView reset = button("Reset to default", Color.rgb(230, 230, 230), Color.BLACK);
         reset.setOnClickListener(v -> {
             Keys.reset(this);
             ble.resetMap();
             learning = 0;
-            testTv.setText("Default button e fire geche");
+            testTv.setText("Buttons reset to default");
             refreshLabels();
         });
         c3.addView(reset);
@@ -204,14 +204,14 @@ public class RemoteActivity extends Activity
         }
         BluetoothAdapter a = ble.adapter();
         if (a == null) {
-            testTv.setText("Ei phone e Bluetooth nei");
+            testTv.setText("This phone has no Bluetooth");
             return;
         }
         if (!a.isEnabled()) {
             try {
                 startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
             } catch (Exception e) {
-                testTv.setText("Phone er Bluetooth on kore abar chapun");
+                testTv.setText("Turn on phone Bluetooth and tap again");
             }
             return;
         }
@@ -219,15 +219,15 @@ public class RemoteActivity extends Activity
         foundName.clear();
         foundAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
         scanDialog = new AlertDialog.Builder(this)
-                .setTitle("Remote khujchi… (remote on rakhun)")
+                .setTitle("Searching… (keep the remote on)")
                 .setAdapter(foundAdapter, (d, w) -> {
                     ble.stopScan();
                     String addr = foundAddr.get(w);
                     String name = foundName.get(w);
                     ble.connect(addr, name, false);
-                    testTv.setText("Connect hocche: " + name + "\nTarpor niche Button set korun");
+                    testTv.setText("Connecting: " + name + "\nThen set the buttons below");
                 })
-                .setNegativeButton("Bondho", (d, w) -> ble.stopScan())
+                .setNegativeButton("Close", (d, w) -> ble.stopScan())
                 .show();
         ble.startScan((addr, name) -> {
             if (foundAddr.contains(addr) || scanDialog == null) return;
@@ -244,7 +244,7 @@ public class RemoteActivity extends Activity
         super.onRequestPermissionsResult(code, p, r);
         if (code == 7) {
             if (BleRemote.hasPerms(this)) startScanFlow();
-            else testTv.setText("Bluetooth permission dorkar — abar chapun ar \"Allow\" din");
+            else testTv.setText("Bluetooth permission needed — tap again and choose \"Allow\"");
         }
     }
 
@@ -263,7 +263,7 @@ public class RemoteActivity extends Activity
             refreshLabels();
         } else {
             testTv.setText("Remote signal: " + sig + "\n→  "
-                    + (action == Keys.NONE ? "(set kora nei — niche Set korun)" : Keys.NAMES[action]));
+                    + (action == Keys.NONE ? "(not set — use Set below)" : Keys.NAMES[action]));
         }
     }
 
@@ -322,7 +322,7 @@ public class RemoteActivity extends Activity
             int k = Keys.custom(this, a);
             boolean b = ble.mapped(a) != null;
             if (learning == a) {
-                keyLabels[a].setText("chapun…");
+                keyLabels[a].setText("press…");
                 keyLabels[a].setTextColor(Color.rgb(230, 120, 0));
             } else if (b || k != -1) {
                 String s = b ? "Remote ✓" : "";
@@ -339,13 +339,13 @@ public class RemoteActivity extends Activity
     private void refreshWifi() {
         boolean on = RemoteServer.running();
         String url = RemoteServer.url();
-        wifiBtn.setText(on ? "⏹  Phone remote bondho korun" : "▶  Phone remote chalu korun");
+        wifiBtn.setText(on ? "⏹  Stop phone remote" : "▶  Start phone remote");
         if (on && url != null) {
-            wifiTv.setText("✅ Chalu — arekta phone e khulun:\n" + url);
+            wifiTv.setText("✅ Running — open on the other phone:\n" + url);
             qrIv.setImageBitmap(RemoteServer.qr(url, 400));
             qrIv.setVisibility(android.view.View.VISIBLE);
         } else {
-            wifiTv.setText(url == null ? "Phone WiFi / hotspot e connect nei" : "Bondho");
+            wifiTv.setText(url == null ? "Phone is not on WiFi / hotspot" : "Stopped");
             qrIv.setVisibility(android.view.View.GONE);
         }
     }
@@ -356,7 +356,7 @@ public class RemoteActivity extends Activity
         TextView t = new TextView(this);
         t.setTextSize(15);
         if (names.isEmpty()) {
-            t.setText("Kono keyboard-type remote connect nei");
+            t.setText("No keyboard-type remote connected");
             t.setTextColor(Color.GRAY);
         } else {
             t.setText("✅  " + android.text.TextUtils.join("\n✅  ", names));
@@ -379,7 +379,7 @@ public class RemoteActivity extends Activity
             } else {
                 int a = Keys.actionFor(this, code);
                 testTv.setText("Button: " + Keys.keyName(code) + "\n→  "
-                        + (a == Keys.NONE ? "(kono kaj nei — Set diye din)" : Keys.NAMES[a]));
+                        + (a == Keys.NONE ? "(no action — use Set)" : Keys.NAMES[a]));
             }
             refreshDevices();
         }

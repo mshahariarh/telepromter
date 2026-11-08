@@ -87,14 +87,14 @@ public class VoiceScroller implements RecognitionListener {
     void start(String language) {
         lang = language;
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
-            target.voiceState("Ei phone e voice recognition nei — Google app update korun", false);
+            target.voiceState("Voice recognition not available — update the Google app", false);
             return;
         }
         stopInternal();
         sr = SpeechRecognizer.createSpeechRecognizer(ctx);
         sr.setRecognitionListener(this);
         active = true;
-        target.voiceState("🎤 Voice scroll ON — porte shuru korun", true);
+        target.voiceState("🎤 Voice scroll ON — start reading", true);
         listen();
     }
 
@@ -243,7 +243,7 @@ public class VoiceScroller implements RecognitionListener {
     public void onError(int e) {
         if (e == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
             active = false;
-            target.voiceState("Mic permission dorkar", false);
+            target.voiceState("Microphone permission needed", false);
             return;
         }
         again(e == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 600 : 150);

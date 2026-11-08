@@ -94,8 +94,8 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
     String savedAddr() { return Store.prefs(ctx).getString("ble_addr", ""); }
 
     String statusText() {
-        if (savedAddr().isEmpty()) return "Kono remote connect kora nei";
-        return connected ? "✅  Connected: " + savedName() : "⏳  Khujchi: " + savedName() + " (remote on korun)";
+        if (savedAddr().isEmpty()) return "No remote connected";
+        return connected ? "✅  Connected: " + savedName() : "⏳  Searching: " + savedName() + " (turn the remote on)";
     }
 
     void setRawListener(RawListener l) {
@@ -118,7 +118,7 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
         try {
             BluetoothAdapter a = adapter();
             if (a == null || !a.isEnabled()) {
-                state(false, "Phone er Bluetooth bondho — on korun");
+                state(false, "Phone Bluetooth is off — please turn it on");
                 return;
             }
             BluetoothDevice d = a.getRemoteDevice(addr);
@@ -127,7 +127,7 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
                     : d.connectGatt(ctx, background, cb);
             state(false, "⏳  Connecting: " + savedName());
         } catch (Exception e) {
-            state(false, "Connect hoyni — abar chesta korun");
+            state(false, "Could not connect — please try again");
         }
     }
 
@@ -178,7 +178,7 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
                 } catch (Exception ignored) {
                 }
                 if (g == gatt) gatt = null;
-                state(false, "⏳  Remote disconnected — abar connect hobe…");
+                state(false, "⏳  Remote disconnected — reconnecting…");
                 if (was) toast("⚠ Remote disconnected");
                 // keep trying in the background; the system waits until the remote is back
                 if (wanted) main.postDelayed(() -> {

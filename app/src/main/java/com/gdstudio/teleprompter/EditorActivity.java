@@ -76,7 +76,7 @@ public class EditorActivity extends Activity {
         root.addView(title);
 
         body = new EditText(this);
-        body.setHint("Script likhun ba paste korun...");
+        body.setHint("Type or paste your script...");
         body.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         body.setGravity(Gravity.TOP | Gravity.START);

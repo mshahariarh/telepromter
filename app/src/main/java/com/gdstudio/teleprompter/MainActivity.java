@@ -76,7 +76,7 @@ public class MainActivity extends Activity {
         root.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
 
         searchBox = new EditText(this);
-        searchBox.setHint("Script khujun…");
+        searchBox.setHint("Search scripts…");
         searchBox.setSingleLine(true);
         searchBox.setTextColor(Color.BLACK);
         searchBox.setVisibility(View.GONE);
@@ -155,7 +155,7 @@ public class MainActivity extends Activity {
         }
         if (shown == 0) {
             TextView e = new TextView(this);
-            e.setText("Kono script nei\n\n＋ chepe notun script banan");
+            e.setText("No scripts yet\n\nTap ＋ to create a new script");
             e.setTextColor(Color.GRAY);
             e.setTextSize(16);
             e.setGravity(Gravity.CENTER);
@@ -259,8 +259,8 @@ public class MainActivity extends Activity {
                         render();
                     } else {
                         new AlertDialog.Builder(this)
-                                .setTitle("Delete korben?")
-                                .setMessage("\"" + s.title + "\" muche jabe.")
+                                .setTitle("Delete this script?")
+                                .setMessage("\"" + s.title + "\" will be deleted.")
                                 .setPositiveButton("Delete", (a, b) -> {
                                     Store.delete(this, s.id);
                                     render();
@@ -293,7 +293,7 @@ public class MainActivity extends Activity {
         for (int i = 0; i < fl.size(); i++) items[i + 1] = "📁 " + fl.get(i);
         items[fl.size() + 1] = "＋ New folder";
         new AlertDialog.Builder(this)
-                .setTitle("Folder e rakhun")
+                .setTitle("Move to folder")
                 .setItems(items, (d, w) -> {
                     if (w == 0) s.folder = "";
                     else if (w <= fl.size()) s.folder = fl.get(w - 1);
@@ -335,12 +335,12 @@ public class MainActivity extends Activity {
     private String readTime(String t) {
         int words = (t == null || t.trim().isEmpty()) ? 0 : t.trim().split("\\s+").length;
         int min = Math.round(words / 130f);
-        return words + " shobdo · " + (min < 1 ? "<1" : String.valueOf(min)) + " min";
+        return words + " words · " + (min < 1 ? "<1" : String.valueOf(min)) + " min";
     }
 
     private void menu() {
-        String[] items = {"📥  File import (txt / Word / PDF)", "💾  Backup save korun",
-                "♻  Backup theke ferot anun", sortByName ? "↕  Sort: notun age" : "↕  Sort: nam (A-Z)",
+        String[] items = {"📥  File import (txt / Word / PDF)", "💾  Save backup",
+                "♻  Restore from backup", sortByName ? "↕  Sort: newest first" : "↕  Sort: name (A-Z)",
                 "ⓘ  About"};
         new AlertDialog.Builder(this)
                 .setItems(items, (d, w) -> {
@@ -355,7 +355,7 @@ public class MainActivity extends Activity {
                         try {
                             startActivityForResult(i, REQ_BACKUP_SAVE);
                         } catch (Exception e) {
-                            toast("File save khola jacche na");
+                            toast("Could not open file save");
                         }
                     } else if (w == 2) pick(REQ_BACKUP_LOAD, new String[]{"application/json", "text/plain",
                             "application/octet-stream"});
@@ -375,7 +375,7 @@ public class MainActivity extends Activity {
         try {
             startActivityForResult(i, req);
         } catch (Exception e) {
-            toast("File picker khola jacche na");
+            toast("Could not open file picker");
         }
     }
 
@@ -388,29 +388,29 @@ public class MainActivity extends Activity {
         else if (req == REQ_BACKUP_SAVE) {
             try (java.io.OutputStream o = getContentResolver().openOutputStream(u)) {
                 o.write(Importer.exportJson(this).getBytes("UTF-8"));
-                toast("Backup save hoyeche ✓");
+                toast("Backup saved ✓");
             } catch (Exception e) {
-                toast("Backup save hoyni");
+                toast("Backup could not be saved");
             }
         } else if (req == REQ_BACKUP_LOAD) {
             try {
                 int n = Importer.importJson(this, Importer.txt(this, u));
-                toast(n + " ta script ferot ana hoyeche ✓");
+                toast(n + " scripts restored ✓");
                 render();
             } catch (Exception e) {
-                toast("Backup file thik na");
+                toast("This backup file is not valid");
             }
         }
     }
 
     private void importUri(Uri u) {
-        toast("Import hocche…");
+        toast("Importing…");
         new Thread(() -> {
             try {
                 Importer.Result r = Importer.read(this, u);
                 runOnUiThread(() -> saveImported(r.title, r.text));
             } catch (Exception e) {
-                runOnUiThread(() -> toast("Import hoyni: " + e.getMessage()));
+                runOnUiThread(() -> toast("Import failed: " + e.getMessage()));
             }
         }).start();
     }
@@ -425,7 +425,7 @@ public class MainActivity extends Activity {
         s.time = System.currentTimeMillis();
         Store.put(this, s);
         render();
-        toast("✓ \"" + s.title + "\" add hoyeche");
+        toast("✓ \"" + s.title + "\" added");
         startActivity(new Intent(this, EditorActivity.class).putExtra("id", s.id));
     }
 
@@ -461,9 +461,9 @@ public class MainActivity extends Activity {
     private void about() {
         new AlertDialog.Builder(this)
                 .setTitle("GD Teleprompter")
-                .setMessage("Version 5.1\n\nDeveloper: M. Shahariar\n\n"
+                .setMessage("Version 5.2\n\nDeveloper: M. Shahariar\n\n"
                         + "Remote (Feelworld, Bluetooth, phone), voice scroll, Bangla font, "
-                        + "PAUSE marker, file import o backup soho teleprompter app.")
+                        + "PAUSE markers, file import and backup.")
                 .setPositiveButton("OK", null)
                 .show();
     }

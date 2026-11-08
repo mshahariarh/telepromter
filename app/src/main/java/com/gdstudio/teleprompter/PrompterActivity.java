@@ -208,7 +208,7 @@ public class PrompterActivity extends Activity
         applyStyle(false);
         updateToggles();
         updateTimer();
-        showStatus("Ready — ▶ chapun ba remote use korun");
+        showStatus("Ready — press ▶ or use the remote");
     }
 
     private void loadSettings() {
@@ -247,7 +247,7 @@ public class PrompterActivity extends Activity
 
     private void loadText() {
         String body = script == null ? "" : script.text;
-        if (body == null || body.trim().isEmpty()) body = "(Script khali — upore ✎ chepe likhun)";
+        if (body == null || body.trim().isEmpty()) body = "(Script is empty — tap ✎ above to write)";
         readEnd = -1;
         lastVoiceY = -1;
         readSpan = null;
@@ -324,7 +324,7 @@ public class PrompterActivity extends Activity
             loop = !loop;
             saveSettings();
             updateToggles();
-            showStatus(loop ? "Loop ON — shesh hole abar shuru" : "Loop OFF");
+            showStatus(loop ? "Loop ON — restarts at the end" : "Loop OFF");
         });
         ImageView up = tool(bar, R.drawable.ic_up, v -> jump(-1));
         up.setOnLongClickListener(v -> { toTop(); return true; });
@@ -438,7 +438,7 @@ public class PrompterActivity extends Activity
         textSwatches = swatchRow(box, TEXT_COLORS, true);
         box.addView(label("Background"));
         bgSwatches = swatchRow(box, BG_COLORS, false);
-        box.addView(label("Pora lekhar rong (jototuku pora shesh)"));
+        box.addView(label("Read text colour"));
         HorizontalScrollView rhs = new HorizontalScrollView(this);
         rhs.setHorizontalScrollBarEnabled(false);
         readRow = new LinearLayout(this);
@@ -503,7 +503,7 @@ public class PrompterActivity extends Activity
         plus.setTextSize(22);
         speedPanel.addView(row);
 
-        speedPanel.addView(label("🎤 Voice scroll — apni porle script nije egobe"));
+        speedPanel.addView(label("🎤 Voice scroll — script follows your voice"));
         LinearLayout vrow = new LinearLayout(this);
         chip(vrow, "🎤  On / Off", v -> toggleVoice());
         langBtn = chip(vrow, langLabel(), v -> {
@@ -514,7 +514,7 @@ public class PrompterActivity extends Activity
         });
         speedPanel.addView(vrow);
 
-        slider(speedPanel, "Countdown (play er age)", 0, 10, countdown,
+        slider(speedPanel, "Countdown (before play)", 0, 10, countdown,
                 v -> v == 0 ? "Off" : v + " sec", v -> { countdown = v; saveSettings(); });
 
         FrameLayout.LayoutParams pl = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
@@ -745,7 +745,7 @@ public class PrompterActivity extends Activity
         scroll.scrollBy(0, step);
         pos = scroll.getScrollY();
         resyncVoice();
-        showStatus(direction > 0 ? "▼  Samne" : "▲  Pichone");
+        showStatus(direction > 0 ? "▼  Forward" : "▲  Back");
     }
 
     private void updateTimer() {
@@ -780,18 +780,18 @@ public class PrompterActivity extends Activity
                 pos = stopAt;
                 scroll.scrollTo(0, stopAt);
                 setPlaying(false);
-                showStatus("⏸  PAUSE — play chapun");
+                showStatus("⏸  PAUSE — press play");
                 return;
             }
             if (pos >= max) {
                 if (loop) {
                     pos = 0;
                     scroll.scrollTo(0, 0);
-                    showStatus("↻  Abar shuru");
+                    showStatus("↻  Restarting");
                 } else {
                     scroll.scrollTo(0, max);
                     setPlaying(false);
-                    showStatus("Shesh ✓");
+                    showStatus("End ✓");
                     return;
                 }
             } else {
@@ -884,7 +884,7 @@ public class PrompterActivity extends Activity
     }
 
     private String langLabel() {
-        return prefs.getString("voice_lang", "bn-BD").equals("bn-BD") ? "Bhasha: বাংলা" : "Language: English";
+        return prefs.getString("voice_lang", "bn-BD").equals("bn-BD") ? "Language: Bangla" : "Language: English";
     }
 
     private void toggleVoice() {
@@ -909,7 +909,7 @@ public class PrompterActivity extends Activity
         super.onRequestPermissionsResult(code, p, r);
         if (code != 11) return;
         if (r.length > 0 && r[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) toggleVoice();
-        else showStatus("Mic permission chara voice scroll hobe na");
+        else showStatus("Voice scroll needs microphone permission");
     }
 
     @Override
@@ -1021,7 +1021,7 @@ public class PrompterActivity extends Activity
                     && event.getKeyCode() != KeyEvent.KEYCODE_BACK
                     && event.getKeyCode() != KeyEvent.KEYCODE_HOME)
                 showStatus("Remote button: " + Keys.keyName(event.getKeyCode())
-                        + " — Bluetooth icon → Button set e Set korun");
+                        + " — set it in Bluetooth icon → Button set");
             return super.dispatchKeyEvent(event);
         }
         if (event.getAction() == KeyEvent.ACTION_DOWN) doAction(action, event.getRepeatCount() == 0);
@@ -1039,7 +1039,7 @@ public class PrompterActivity extends Activity
                     if (countLeft > 0) togglePlay();
                     if (playing) setPlaying(false);
                     toTop();
-                    showStatus("⏮  Double press — shurute");
+                    showStatus("⏮  Double press — back to start");
                 } else {
                     lastPlayPress = now;
                     togglePlay();
@@ -1051,7 +1051,7 @@ public class PrompterActivity extends Activity
             case Keys.SLOWER: changeSpeed(-1); break;
             case Keys.EXIT: if (first) finish(); break;
             case Keys.TOP:
-                if (first) { toTop(); showStatus("⏮  Shurute"); }
+                if (first) { toTop(); showStatus("⏮  Start"); }
                 break;
             case Keys.FONT_UP:
                 fontSize = Math.min(140, fontSize + 4);
