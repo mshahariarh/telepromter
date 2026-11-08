@@ -218,7 +218,7 @@ public class VoiceScroller implements RecognitionListener {
 
     @Override
     public void onError(int e) {
-        if (e == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSION) {
+        if (e == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
             active = false;
             target.voiceState("Mic permission dorkar", false);
             return;
