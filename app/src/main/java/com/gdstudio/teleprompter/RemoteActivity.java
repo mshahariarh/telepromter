@@ -367,6 +367,19 @@ public class RemoteActivity extends Activity
     }
 
     @Override
+    public boolean dispatchGenericMotionEvent(android.view.MotionEvent ev) {
+        if (RemoteNav.isJoystick(ev) && ev.getActionMasked() == android.view.MotionEvent.ACTION_MOVE) {
+            int d = RemoteNav.joyDir(ev);
+            if (d != 0) {
+                String[] n = {"", "LEFT", "RIGHT", "UP", "DOWN"};
+                testTv.setText("Joystick: " + n[d] + "\n→  moves the menu highlight (press Select / OK to choose)");
+            }
+            return true;
+        }
+        return super.dispatchGenericMotionEvent(ev);
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int code = e.getKeyCode();
         if (code == KeyEvent.KEYCODE_BACK) return super.dispatchKeyEvent(e);

@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     private ImageView bt;
     private EditText searchBox;
     private boolean sortByName = false;
+    private RemoteNav nav;
     private String filter = ""; // "" = all folders
 
     interface StrCb { void on(String s); }
@@ -126,6 +127,7 @@ public class MainActivity extends Activity {
         root.addView(bottom);
 
         setContentView(root);
+        nav = new RemoteNav(this);
         handleShare(getIntent());
     }
 
@@ -162,13 +164,27 @@ public class MainActivity extends Activity {
             e.setPadding(dp(24), dp(80), dp(24), dp(24));
             list.addView(e);
         }
+        LinearLayout devRow = new LinearLayout(this);
+        devRow.setGravity(Gravity.CENTER);
+        devRow.setPadding(0, dp(24), 0, dp(24));
+        ImageView pic = new ImageView(this);
+        pic.setImageResource(R.drawable.dev_photo);
+        pic.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        pic.setClipToOutline(true);
+        pic.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline o) {
+                o.setOval(0, 0, v.getWidth(), v.getHeight());
+            }
+        });
+        devRow.addView(pic, new LinearLayout.LayoutParams(dp(30), dp(30)));
         TextView dev = new TextView(this);
         dev.setText("GD Teleprompter  •  Developer: M. Shahariar");
-        dev.setTextColor(Color.rgb(160, 160, 160));
+        dev.setTextColor(Color.rgb(140, 140, 140));
         dev.setTextSize(12);
-        dev.setGravity(Gravity.CENTER);
-        dev.setPadding(0, dp(24), 0, dp(24));
-        list.addView(dev);
+        dev.setPadding(dp(10), 0, 0, 0);
+        devRow.addView(dev);
+        list.addView(devRow);
     }
 
     private View row(Store.Script s, SimpleDateFormat f) {
@@ -466,6 +482,24 @@ public class MainActivity extends Activity {
                         + "PAUSE markers, file import and backup.")
                 .setPositiveButton("OK", null)
                 .show();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent e) {
+        if (nav != null) {
+            if (nav.onKey(e)) return true;
+            if (!nav.isActive() && Keys.actionFor(this, e.getKeyCode()) == Keys.SELECT) {
+                if (e.getAction() == android.view.KeyEvent.ACTION_DOWN) nav.start();
+                return true;
+            }
+        }
+        return super.dispatchKeyEvent(e);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(android.view.MotionEvent ev) {
+        if (nav != null && nav.onMotion(ev)) return true;
+        return super.dispatchGenericMotionEvent(ev);
     }
 
     private void newFolder(StrCb cb) {

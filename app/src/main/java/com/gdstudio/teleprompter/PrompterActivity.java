@@ -73,6 +73,7 @@ public class PrompterActivity extends Activity
     private android.text.style.ForegroundColorSpan readSpan;
     private android.animation.ValueAnimator scrollAnim;
     private LinearLayout readRow;
+    private RemoteNav nav;
     private static final int[] READ_COLORS = {0, Color.rgb(120, 120, 130), Color.rgb(255, 214, 0),
             Color.rgb(0, 230, 118), Color.rgb(0, 229, 255), Color.rgb(255, 145, 0), Color.rgb(229, 57, 53)};
 
@@ -204,6 +205,8 @@ public class PrompterActivity extends Activity
         });
 
         setContentView(root);
+        nav = new RemoteNav(this);
+        nav.setDefault(playIv);
         loadText();
         applyStyle(false);
         updateToggles();
@@ -1012,6 +1015,7 @@ public class PrompterActivity extends Activity
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (nav != null && nav.onKey(event)) return true;
         int action = Keys.actionFor(this, event.getKeyCode());
         if (action == Keys.NONE) {
             // show unknown remote buttons so the user can see the signal arrives
@@ -1079,7 +1083,20 @@ public class PrompterActivity extends Activity
                     showStatus(loop ? "Loop ON" : "Loop OFF");
                 }
                 break;
+            case Keys.SELECT:
+                if (first) {
+                    if (nav.isActive()) nav.select();
+                    else nav.start();
+                }
+                break;
         }
+    }
+
+    /** Joystick on the remote: move the menu highlight. */
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent ev) {
+        if (nav != null && nav.onMotion(ev)) return true;
+        return super.dispatchGenericMotionEvent(ev);
     }
 
     @Override

@@ -13,12 +13,12 @@ import java.util.List;
 public class Keys {
 
     static final int NONE = 0, PLAY = 1, BACK = 2, FWD = 3, FASTER = 4, SLOWER = 5, EXIT = 6,
-            TOP = 7, FONT_UP = 8, FONT_DN = 9, MIRROR = 10, LOOP = 11;
+            TOP = 7, FONT_UP = 8, FONT_DN = 9, MIRROR = 10, LOOP = 11, SELECT = 12;
     /** last action that can be learned in "Button set" */
-    static final int LAST = LOOP;
+    static final int LAST = SELECT;
     static final String[] NAMES = {"", "Play / Pause", "Scroll back", "Scroll forward",
             "Speed +", "Speed −", "Exit prompter", "Go to start", "Font bigger",
-            "Font smaller", "Mirror on/off", "Loop on/off"};
+            "Font smaller", "Mirror on/off", "Loop on/off", "Select / OK (menu)"};
 
     static int actionFor(Context c, int keyCode) {
         SharedPreferences p = Store.prefs(c);
@@ -58,6 +58,9 @@ public class Keys {
                 return SLOWER;
             case KeyEvent.KEYCODE_ESCAPE:
                 return EXIT;
+            case KeyEvent.KEYCODE_BUTTON_THUMBL:
+            case KeyEvent.KEYCODE_BUTTON_SELECT:
+                return SELECT;
         }
         return NONE;
     }
@@ -68,6 +71,13 @@ public class Keys {
         for (int a = PLAY; a <= LAST; a++)
             if (p.getInt("km_" + a, -1) == keyCode) e.remove("km_" + a);
         e.putInt("km_" + action, keyCode).apply();
+    }
+
+    /** true when the user assigned this key to an action in "Button set" */
+    static boolean isCustom(Context c, int keyCode) {
+        SharedPreferences p = Store.prefs(c);
+        for (int a = PLAY; a <= LAST; a++) if (p.getInt("km_" + a, -1) == keyCode) return true;
+        return false;
     }
 
     static int custom(Context c, int action) {
