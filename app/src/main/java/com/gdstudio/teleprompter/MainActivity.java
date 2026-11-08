@@ -119,7 +119,8 @@ public class MainActivity extends Activity {
     private void render() {
         list.removeAllViews();
         // green Bluetooth icon when a remote is connected
-        bt.setColorFilter(Keys.remotes().isEmpty() ? Color.WHITE : Color.rgb(0, 230, 118));
+        boolean remoteOn = BleRemote.get(this).isConnected() || !Keys.remotes().isEmpty();
+        bt.setColorFilter(remoteOn ? Color.rgb(0, 230, 118) : Color.WHITE);
         folderBtn.setText(filter.isEmpty() ? "All" : "📁 " + filter);
         List<Store.Script> all = Store.all(this);
         Collections.sort(all, (a, b) -> Long.compare(b.time, a.time));

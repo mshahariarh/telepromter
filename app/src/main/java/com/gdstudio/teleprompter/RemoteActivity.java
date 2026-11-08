@@ -1,6 +1,8 @@
 package com.gdstudio.teleprompter;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -11,21 +13,30 @@ import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.util.ArrayList;
 import java.util.List;
 
-/** Remote connect status (live), pairing shortcut, button test and button learning. */
-public class RemoteActivity extends Activity implements InputManager.InputDeviceListener {
+/** Remote connect: in-app BLE remotes (Feelworld etc.), system remotes, button test & learning. */
+public class RemoteActivity extends Activity
+        implements InputManager.InputDeviceListener, BleRemote.RawListener {
 
     private LinearLayout devList;
-    private TextView testTv;
+    private TextView testTv, bleStatus;
     private final TextView[] keyLabels = new TextView[6];
     private int learning = 0;
     private InputManager im;
+    private BleRemote ble;
+
+    private final List<String> foundAddr = new ArrayList<>();
+    private final List<String> foundName = new ArrayList<>();
+    private ArrayAdapter<String> foundAdapter;
+    private AlertDialog scanDialog;
 
     private int dp(float v) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
@@ -35,6 +46,7 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ble = BleRemote.get(this);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -64,12 +76,30 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
         sv.addView(box);
         root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        // 1. Status
-        LinearLayout c1 = card(box, "Connected remote");
+        // 1. In-app BLE remote (Feelworld etc.)
+        LinearLayout c0 = card(box, "Feelworld / teleprompter remote");
+        bleStatus = new TextView(this);
+        bleStatus.setTextSize(15);
+        bleStatus.setTypeface(Typeface.DEFAULT_BOLD);
+        c0.addView(bleStatus);
+        TextView scan = button("🔍  Remote khujun o connect korun", Color.rgb(255, 196, 0), Color.BLACK);
+        scan.setOnClickListener(v -> startScanFlow());
+        c0.addView(scan);
+        TextView forget = button("Remote bad din (forget)", Color.rgb(230, 230, 230), Color.BLACK);
+        forget.setOnClickListener(v -> ble.forget());
+        c0.addView(forget);
+        c0.addView(note("1. Remote on korun (LED jolbe)\n"
+                + "2. Upore holud button chapun → list theke \"Feelworld-…\" tap korun\n"
+                + "3. Niche \"Button set\" e protita button 1 bar set korun\n\n"
+                + "Phone er Bluetooth settings e pair korar dorkar nei. Ekbar korle porer bar "
+                + "app khullei remote nije nije connect hobe, kete gele abar connect hobe."));
+
+        // 2. Normal Bluetooth remotes / clickers
+        LinearLayout c1 = card(box, "Onno remote / clicker (keyboard type)");
         devList = new LinearLayout(this);
         devList.setOrientation(LinearLayout.VERTICAL);
         c1.addView(devList);
-        TextView pair = button("🔗  Notun remote pair korun", Color.rgb(255, 196, 0), Color.BLACK);
+        TextView pair = button("🔗  Phone Bluetooth settings", Color.rgb(230, 230, 230), Color.BLACK);
         pair.setOnClickListener(v -> {
             try {
                 startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
@@ -77,12 +107,9 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
             }
         });
         c1.addView(pair);
-        c1.addView(note("1. Remote on kore pairing mode e din (sadharonoto button long-press)\n"
-                + "2. Upore button chepe Bluetooth list theke remote er nam tap korun\n"
-                + "3. Ekhane fire ashun — upore ✅ dekhabe\n\n"
-                + "Ekbar pair korle porer bar remote on korlei nije nije connect hobe."));
+        c1.addView(note("Selfie remote, presentation clicker, keyboard — egulo phone settings e pair hoy."));
 
-        // 2. Test
+        // 3. Test
         LinearLayout c2 = card(box, "Remote test");
         testTv = new TextView(this);
         testTv.setText("Remote er je kono button chapun…");
@@ -96,9 +123,9 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
         testTv.setBackground(tb);
         c2.addView(testTv);
 
-        // 3. Learn buttons
-        LinearLayout c3 = card(box, "Button set (optional)");
-        c3.addView(note("Remote er kono button onno kaj korle: \"Set\" chepe remote er sei button ta chapun."));
+        // 4. Learn buttons
+        LinearLayout c3 = card(box, "Button set");
+        c3.addView(note("\"Set\" chepe remote er je button ta ei kaj korbe sheta chapun. Feelworld remote e ekbar korlei hobe."));
         for (int a = Keys.PLAY; a <= Keys.SLOWER; a++) {
             final int action = a;
             LinearLayout r = new LinearLayout(this);
@@ -125,6 +152,7 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
         TextView reset = button("Default e firun", Color.rgb(230, 230, 230), Color.BLACK);
         reset.setOnClickListener(v -> {
             Keys.reset(this);
+            ble.resetMap();
             learning = 0;
             testTv.setText("Default button e fire geche");
             refreshLabels();
@@ -134,6 +162,80 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
         setContentView(root);
         refreshLabels();
     }
+
+    // ---------- BLE scan flow ----------
+
+    private void startScanFlow() {
+        if (!BleRemote.hasPerms(this)) {
+            requestPermissions(BleRemote.perms(), 7);
+            return;
+        }
+        BluetoothAdapter a = ble.adapter();
+        if (a == null) {
+            testTv.setText("Ei phone e Bluetooth nei");
+            return;
+        }
+        if (!a.isEnabled()) {
+            try {
+                startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
+            } catch (Exception e) {
+                testTv.setText("Phone er Bluetooth on kore abar chapun");
+            }
+            return;
+        }
+        foundAddr.clear();
+        foundName.clear();
+        foundAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        scanDialog = new AlertDialog.Builder(this)
+                .setTitle("Remote khujchi… (remote on rakhun)")
+                .setAdapter(foundAdapter, (d, w) -> {
+                    ble.stopScan();
+                    String addr = foundAddr.get(w);
+                    String name = foundName.get(w);
+                    ble.connect(addr, name, false);
+                    testTv.setText("Connect hocche: " + name + "\nTarpor niche Button set korun");
+                })
+                .setNegativeButton("Bondho", (d, w) -> ble.stopScan())
+                .show();
+        ble.startScan((addr, name) -> {
+            if (foundAddr.contains(addr) || scanDialog == null) return;
+            boolean fw = name.toLowerCase().contains("feelworld");
+            int idx = fw ? 0 : foundAddr.size();
+            foundAddr.add(idx, addr);
+            foundName.add(idx, name);
+            foundAdapter.insert((fw ? "⭐  " : "") + name, idx);
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] p, int[] r) {
+        super.onRequestPermissionsResult(code, p, r);
+        if (code == 7) {
+            if (BleRemote.hasPerms(this)) startScanFlow();
+            else testTv.setText("Bluetooth permission dorkar — abar chapun ar \"Allow\" din");
+        }
+    }
+
+    @Override
+    public void onBleState(boolean connected, String text) {
+        bleStatus.setText(text);
+        bleStatus.setTextColor(connected ? Color.rgb(0, 140, 70) : Color.rgb(200, 120, 0));
+    }
+
+    @Override
+    public void onBleRaw(String sig, int action) {
+        if (learning > 0) {
+            ble.assign(learning, sig);
+            testTv.setText("✓  Remote button  →  " + Keys.NAMES[learning]);
+            learning = 0;
+            refreshLabels();
+        } else {
+            testTv.setText("Remote signal: " + sig + "\n→  "
+                    + (action == Keys.NONE ? "(set kora nei — niche Set korun)" : Keys.NAMES[action]));
+        }
+    }
+
+    // ---------- UI helpers ----------
 
     private LinearLayout card(LinearLayout parent, String title) {
         LinearLayout c = new LinearLayout(this);
@@ -186,12 +288,18 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
     private void refreshLabels() {
         for (int a = Keys.PLAY; a <= Keys.SLOWER; a++) {
             int k = Keys.custom(this, a);
+            boolean b = ble.mapped(a) != null;
             if (learning == a) {
                 keyLabels[a].setText("chapun…");
                 keyLabels[a].setTextColor(Color.rgb(230, 120, 0));
+            } else if (b || k != -1) {
+                String s = b ? "Remote ✓" : "";
+                if (k != -1) s += (s.isEmpty() ? "" : " + ") + Keys.keyName(k);
+                keyLabels[a].setText(s);
+                keyLabels[a].setTextColor(Color.rgb(0, 140, 70));
             } else {
-                keyLabels[a].setText(k == -1 ? "Default" : Keys.keyName(k));
-                keyLabels[a].setTextColor(k == -1 ? Color.GRAY : Color.rgb(0, 140, 70));
+                keyLabels[a].setText("Default");
+                keyLabels[a].setTextColor(Color.GRAY);
             }
         }
     }
@@ -199,23 +307,17 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
     private void refreshDevices() {
         devList.removeAllViews();
         List<String> names = Keys.remotes();
+        TextView t = new TextView(this);
+        t.setTextSize(15);
         if (names.isEmpty()) {
-            TextView t = new TextView(this);
-            t.setText("❌  Kono remote connect nei");
-            t.setTextColor(Color.rgb(200, 40, 40));
-            t.setTextSize(15);
-            devList.addView(t);
+            t.setText("Kono keyboard-type remote connect nei");
+            t.setTextColor(Color.GRAY);
         } else {
-            for (String n : names) {
-                TextView t = new TextView(this);
-                t.setText("✅  " + n);
-                t.setTextColor(Color.rgb(0, 140, 70));
-                t.setTextSize(15);
-                t.setTypeface(Typeface.DEFAULT_BOLD);
-                t.setPadding(0, dp(2), 0, dp(2));
-                devList.addView(t);
-            }
+            t.setText("✅  " + android.text.TextUtils.join("\n✅  ", names));
+            t.setTextColor(Color.rgb(0, 140, 70));
+            t.setTypeface(Typeface.DEFAULT_BOLD);
         }
+        devList.addView(t);
     }
 
     @Override
@@ -243,6 +345,7 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
         super.onResume();
         im = (InputManager) getSystemService(INPUT_SERVICE);
         im.registerInputDeviceListener(this, null);
+        ble.setRawListener(this);
         refreshDevices();
     }
 
@@ -250,6 +353,8 @@ public class RemoteActivity extends Activity implements InputManager.InputDevice
     protected void onPause() {
         super.onPause();
         if (im != null) im.unregisterInputDeviceListener(this);
+        ble.setRawListener(null);
+        ble.stopScan();
     }
 
     @Override public void onInputDeviceAdded(int id) { refreshDevices(); }
