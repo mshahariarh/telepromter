@@ -33,11 +33,13 @@ import android.widget.TextView;
 import java.util.Locale;
 
 public class PrompterActivity extends Activity
-        implements Choreographer.FrameCallback, InputManager.InputDeviceListener {
+        implements Choreographer.FrameCallback, InputManager.InputDeviceListener, VoiceScroller.Target {
 
     // ---- settings (saved, all live) ----
     private int fontSize, lineSp, letterSp, speed, margin, textColor, bgColor, countdown;
     private boolean mirror, bold, center, loop, landscape;
+    private boolean focus, dblTop;
+    private String fontFace;
 
     private static final int[] TEXT_COLORS = {
             Color.WHITE, Color.rgb(229, 57, 53), Color.rgb(255, 214, 0), Color.rgb(0, 230, 118),
@@ -60,6 +62,13 @@ public class PrompterActivity extends Activity
     private ImageView playIv, textIv, speedIv, loopIv, rotateIv, mirrorIv;
     private SeekBar speedBar;
     private TextView speedLabel;
+    private TextView remainTv, fontBtn, focusBtn, langBtn;
+    private ImageView micIv;
+    private View focusTop, focusBottom;
+    private VoiceScroller voice;
+    private final java.util.ArrayList<Integer> pauseOffsets = new java.util.ArrayList<>();
+    private long lastPlayPress = 0;
+    private float prevPos = 0f;
 
     private int panel = 0; // 0 none, 1 text, 2 speed
     private boolean playing = false;
@@ -119,6 +128,12 @@ public class PrompterActivity extends Activity
         scroll.addView(text, new ScrollView.LayoutParams(-1, -2));
         content.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
 
+        focusTop = new View(this);
+        focusBottom = new View(this);
+        content.addView(focusTop, new FrameLayout.LayoutParams(-1, 0, Gravity.TOP));
+        content.addView(focusBottom, new FrameLayout.LayoutParams(-1, 0, Gravity.BOTTOM));
+        voice = new VoiceScroller(this, this);
+
         guide = new View(this);
         guide.setBackgroundColor(Color.argb(170, 255, 152, 0));
         content.addView(guide, new FrameLayout.LayoutParams(-1, dp(2)));
@@ -156,6 +171,7 @@ public class PrompterActivity extends Activity
                     FrameLayout.LayoutParams pl = (FrameLayout.LayoutParams) textPanel.getLayoutParams();
                     pl.height = Math.min(dp(360), (int) (h * 0.62f));
                     textPanel.setLayoutParams(pl);
+                    layoutFocus(h);
                     applyStyle(true);
                 });
             }
@@ -196,6 +212,9 @@ public class PrompterActivity extends Activity
         loop = prefs.getBoolean("loop", false);
         landscape = prefs.getBoolean("landscape", false);
         countdown = prefs.getInt("countdown2", 0); // off by default
+        focus = prefs.getBoolean("focus", false);
+        dblTop = prefs.getBoolean("dbl_top", false);
+        fontFace = prefs.getString("font_face", Fonts.SYSTEM);
     }
 
     private void saveSettings() {
@@ -207,14 +226,17 @@ public class PrompterActivity extends Activity
                 .putBoolean("bold", bold).putBoolean("center", center)
                 .putBoolean("loop", loop).putBoolean("landscape", landscape)
                 .putInt("countdown2", countdown)
+                .putBoolean("focus", focus).putString("font_face", fontFace)
                 .apply();
     }
 
     private void loadText() {
         String body = script == null ? "" : script.text;
-        text.setText(body == null || body.trim().isEmpty()
-                ? "(Script khali — upore ✎ chepe likhun)" : body);
+        if (body == null || body.trim().isEmpty()) body = "(Script khali — upore ✎ chepe likhun)";
+        text.setText(markup(body));
+        voice.setText(body);
         titleTv.setText(script == null ? "Teleprompter" : script.title);
+        scroll.post(this::updateRemain);
     }
 
     // ===================== bars =====================
@@ -232,6 +254,13 @@ public class PrompterActivity extends Activity
         titleTv.setSingleLine(true);
         titleTv.setEllipsize(TextUtils.TruncateAt.END);
         bar.addView(titleTv, new LinearLayout.LayoutParams(0, -2, 1f));
+        remainTv = new TextView(this);
+        remainTv.setTextColor(Color.rgb(170, 175, 190));
+        remainTv.setTextSize(12);
+        remainTv.setPadding(dp(6), 0, dp(2), 0);
+        bar.addView(remainTv);
+        micIv = barIcon(R.drawable.ic_mic, v -> toggleVoice());
+        bar.addView(micIv);
         bar.addView(barIcon(R.drawable.ic_bluetooth,
                 v -> startActivity(new Intent(this, RemoteActivity.class))));
         bar.addView(barIcon(R.drawable.ic_edit, v -> {
@@ -348,6 +377,36 @@ public class PrompterActivity extends Activity
         textPanel.addView(box);
 
         box.addView(head("T  Text style — live"));
+        LinearLayout fontRow = new LinearLayout(this);
+        fontRow.setPadding(0, dp(8), 0, 0);
+        fontBtn = chip(fontRow, "Font: " + Fonts.label(fontFace), v -> pickFont());
+        box.addView(fontRow);
+        box.addView(label("Quick theme"));
+        HorizontalScrollView ths = new HorizontalScrollView(this);
+        ths.setHorizontalScrollBarEnabled(false);
+        LinearLayout themes = new LinearLayout(this);
+        int[][] presets = {{Color.WHITE, Color.BLACK}, {Color.rgb(229, 57, 53), Color.WHITE},
+                {Color.rgb(255, 214, 0), Color.BLACK}, {Color.WHITE, Color.rgb(13, 27, 62)},
+                {Color.rgb(25, 25, 25), Color.WHITE}, {Color.rgb(0, 230, 118), Color.BLACK}};
+        for (int[] pr : presets) {
+            TextView t = new TextView(this);
+            t.setText("Aa");
+            t.setTextSize(18);
+            t.setTypeface(Typeface.DEFAULT_BOLD);
+            t.setGravity(Gravity.CENTER);
+            t.setTextColor(pr[0]);
+            GradientDrawable d = new GradientDrawable();
+            d.setColor(pr[1]);
+            d.setCornerRadius(dp(10));
+            d.setStroke(dp(1), Color.rgb(90, 95, 110));
+            t.setBackground(d);
+            t.setOnClickListener(v -> { textColor = pr[0]; bgColor = pr[1]; applyStyle(false); });
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(dp(56), dp(44));
+            tlp.rightMargin = dp(10);
+            themes.addView(t, tlp);
+        }
+        ths.addView(themes);
+        box.addView(ths);
         slider(box, "Font size", 14, 140, fontSize, v -> v + "",
                 v -> { fontSize = v; applyStyle(true); });
         slider(box, "Line spacing", 8, 30, lineSp, v -> String.format(Locale.US, "%.1fx", v / 10f),
@@ -366,6 +425,7 @@ public class PrompterActivity extends Activity
         toggles.setPadding(0, dp(14), 0, 0);
         boldBtn = chip(toggles, "B  Bold", v -> { bold = !bold; applyStyle(true); });
         alignBtn = chip(toggles, "≡  Center", v -> { center = !center; applyStyle(false); });
+        focusBtn = chip(toggles, "◐  Focus", v -> { focus = !focus; applyStyle(false); });
         box.addView(toggles);
 
         FrameLayout.LayoutParams pl = new FrameLayout.LayoutParams(-1, dp(340), Gravity.BOTTOM);
@@ -395,6 +455,7 @@ public class PrompterActivity extends Activity
                     speed = p + 1;
                     speedLabel.setText("Speed: " + speed);
                     saveSettings();
+                    updateRemain();
                 }
             }
             public void onStartTrackingTouch(SeekBar s) {}
@@ -404,6 +465,17 @@ public class PrompterActivity extends Activity
         TextView plus = chip(row, "+", v -> changeSpeed(1));
         plus.setTextSize(22);
         speedPanel.addView(row);
+
+        speedPanel.addView(label("🎤 Voice scroll — apni porle script nije egobe"));
+        LinearLayout vrow = new LinearLayout(this);
+        chip(vrow, "🎤  On / Off", v -> toggleVoice());
+        langBtn = chip(vrow, langLabel(), v -> {
+            String l = prefs.getString("voice_lang", "bn-BD").equals("bn-BD") ? "en-US" : "bn-BD";
+            prefs.edit().putString("voice_lang", l).apply();
+            langBtn.setText(langLabel());
+            if (voice.isActive()) voice.start(l);
+        });
+        speedPanel.addView(vrow);
 
         slider(speedPanel, "Countdown (play er age)", 0, 10, countdown,
                 v -> v == 0 ? "Off" : v + " sec", v -> { countdown = v; saveSettings(); });
@@ -503,18 +575,22 @@ public class PrompterActivity extends Activity
         text.setTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize);
         text.setLineSpacing(0, lineSp / 10f);
         text.setLetterSpacing(letterSp / 100f);
-        text.setTypeface(bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        text.setTypeface(Fonts.get(this, fontFace), bold ? Typeface.BOLD : Typeface.NORMAL);
         text.setGravity(center ? Gravity.CENTER_HORIZONTAL : Gravity.START);
         int h = content.getHeight() > 0 ? content.getHeight()
                 : getResources().getDisplayMetrics().heightPixels;
         text.setPadding(dp(margin), guideY > 0 ? guideY : h / 3, dp(margin), h);
         scroll.setScaleX(mirror ? -1f : 1f);
+        layoutFocus(h);
 
         markSwatches(textSwatches, textColor);
         markSwatches(bgSwatches, bgColor);
         chipState(boldBtn, bold);
         chipState(alignBtn, center);
+        chipState(focusBtn, focus);
+        if (fontBtn != null) fontBtn.setText("Font: " + Fonts.label(fontFace));
         saveSettings();
+        scroll.post(this::updateRemain);
 
         if (keepPosition) {
             scroll.post(() -> {
@@ -549,6 +625,7 @@ public class PrompterActivity extends Activity
     // ===================== playback =====================
 
     private void togglePlay() {
+        if (voice != null && voice.isActive()) voice.stop();
         if (countLeft > 0) {
             handler.removeCallbacks(tick);
             countLeft = 0;
@@ -615,6 +692,7 @@ public class PrompterActivity extends Activity
         saveSettings();
         speedBar.setProgress(speed - 1);
         speedLabel.setText("Speed: " + speed);
+        updateRemain();
         showStatus("Speed " + speed + (playing ? "" : "  (Paused)"));
     }
 
@@ -630,6 +708,7 @@ public class PrompterActivity extends Activity
         if (s == shownSec) return;
         shownSec = s;
         timerTv.setText(String.format(Locale.US, "%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60));
+        updateRemain();
     }
 
     private void showStatus(String s) {
@@ -648,8 +727,17 @@ public class PrompterActivity extends Activity
             elapsedMs += (long) (dt * 1000);
             updateTimer();
             if (Math.abs(scroll.getScrollY() - (int) pos) > dp(4)) pos = scroll.getScrollY();
+            prevPos = pos;
             pos += speed * 10f * getResources().getDisplayMetrics().density * dt;
             int max = Math.max(0, text.getHeight() - scroll.getHeight());
+            int stopAt = pauseLine(prevPos, pos);
+            if (stopAt >= 0) {
+                pos = stopAt;
+                scroll.scrollTo(0, stopAt);
+                setPlaying(false);
+                showStatus("⏸  PAUSE — play chapun");
+                return;
+            }
             if (pos >= max) {
                 if (loop) {
                     pos = 0;
@@ -667,6 +755,131 @@ public class PrompterActivity extends Activity
         }
         lastFrame = frameTimeNanos;
         Choreographer.getInstance().postFrameCallback(this);
+    }
+
+    // ===================== v5: markers, reading time, focus, fonts, voice =====================
+
+    /** [PAUSE] / [STOP] / *** lines stop the scroll; other [notes] are shown in orange. */
+    private CharSequence markup(String s) {
+        pauseOffsets.clear();
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(s);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\[[^\\]\\n]{1,40}\\]").matcher(s);
+        while (m.find()) {
+            String tag = m.group().toUpperCase(Locale.ROOT);
+            boolean pause = tag.equals("[PAUSE]") || tag.equals("[STOP]")
+                    || tag.equals("[থামুন]") || tag.equals("[বিরতি]");
+            if (pause) {
+                sb.setSpan(new android.text.style.BackgroundColorSpan(Color.rgb(229, 57, 53)), m.start(), m.end(), 33);
+                sb.setSpan(new android.text.style.ForegroundColorSpan(Color.WHITE), m.start(), m.end(), 33);
+                pauseOffsets.add(m.start());
+            } else {
+                sb.setSpan(new android.text.style.ForegroundColorSpan(ACCENT), m.start(), m.end(), 33);
+                sb.setSpan(new android.text.style.StyleSpan(Typeface.ITALIC), m.start(), m.end(), 33);
+            }
+        }
+        m = java.util.regex.Pattern.compile("(?m)^[ \\t]*\\*{3,}[ \\t]*$").matcher(s);
+        while (m.find()) {
+            sb.setSpan(new android.text.style.BackgroundColorSpan(Color.rgb(229, 57, 53)), m.start(), m.end(), 33);
+            pauseOffsets.add(m.start());
+        }
+        java.util.Collections.sort(pauseOffsets);
+        return sb;
+    }
+
+    /** Scroll position of a pause marker crossed between two positions, or -1. */
+    private int pauseLine(float prev, float now) {
+        android.text.Layout l = text.getLayout();
+        if (l == null || pauseOffsets.isEmpty()) return -1;
+        for (int off : pauseOffsets) {
+            int y = l.getLineTop(l.getLineForOffset(Math.min(off, text.length())));
+            if (prev < y && now >= y) return y;
+        }
+        return -1;
+    }
+
+    private void updateRemain() {
+        if (remainTv == null || text == null) return;
+        int end = Math.max(0, text.getHeight() - scroll.getHeight() - guideY);
+        float pxs = speed * 10f * getResources().getDisplayMetrics().density;
+        long sec = (long) (Math.max(0, end - scroll.getScrollY()) / pxs);
+        remainTv.setText(String.format(Locale.US, "⏱ %d:%02d", sec / 60, sec % 60));
+    }
+
+    private void layoutFocus(int h) {
+        if (focusTop == null) return;
+        focusTop.setVisibility(focus ? View.VISIBLE : View.GONE);
+        focusBottom.setVisibility(focus ? View.VISIBLE : View.GONE);
+        if (!focus || h <= 0) return;
+        int lh = text.getLineHeight();
+        int topH = Math.max(0, guideY - lh / 2);
+        int botH = Math.max(0, h - (guideY + lh * 5 / 2));
+        int strong = (bgColor & 0x00FFFFFF) | 0xE6000000, soft = (bgColor & 0x00FFFFFF) | 0x80000000;
+        focusTop.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{strong, soft}));
+        focusBottom.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{soft, strong}));
+        FrameLayout.LayoutParams a = (FrameLayout.LayoutParams) focusTop.getLayoutParams();
+        a.height = topH;
+        focusTop.setLayoutParams(a);
+        FrameLayout.LayoutParams b = (FrameLayout.LayoutParams) focusBottom.getLayoutParams();
+        b.height = botH;
+        focusBottom.setLayoutParams(b);
+    }
+
+    private void pickFont() {
+        String[] fonts = Fonts.list(this);
+        String[] labels = new String[fonts.length];
+        for (int i = 0; i < fonts.length; i++) labels[i] = Fonts.label(fonts[i]);
+        new android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("Font")
+                .setItems(labels, (d, w) -> {
+                    fontFace = fonts[w];
+                    applyStyle(true);
+                })
+                .show();
+    }
+
+    private String langLabel() {
+        return prefs.getString("voice_lang", "bn-BD").equals("bn-BD") ? "Bhasha: বাংলা" : "Language: English";
+    }
+
+    private void toggleVoice() {
+        if (voice.isActive()) {
+            voice.stop();
+            return;
+        }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 11);
+            return;
+        }
+        if (playing) setPlaying(false);
+        android.text.Layout l = text.getLayout();
+        if (l != null)
+            voice.setPositionFromOffset(l.getLineStart(l.getLineForVertical(scroll.getScrollY())));
+        voice.start(prefs.getString("voice_lang", "bn-BD"));
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] p, int[] r) {
+        super.onRequestPermissionsResult(code, p, r);
+        if (code != 11) return;
+        if (r.length > 0 && r[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) toggleVoice();
+        else showStatus("Mic permission chara voice scroll hobe na");
+    }
+
+    @Override
+    public void voiceGoTo(int off) {
+        android.text.Layout l = text.getLayout();
+        if (l == null) return;
+        int y = l.getLineTop(l.getLineForOffset(Math.min(off, text.length())));
+        scroll.smoothScrollTo(0, y);
+        pos = y;
+        updateRemain();
+    }
+
+    @Override
+    public void voiceState(String s, boolean on) {
+        showStatus(s);
+        activeBg(micIv, on);
     }
 
     // ===================== remote =====================
@@ -692,7 +905,20 @@ public class PrompterActivity extends Activity
     /** One place for every remote/keyboard action. */
     void doAction(int action, boolean first) {
         switch (action) {
-            case Keys.PLAY: if (first) togglePlay(); break;
+            case Keys.PLAY:
+                if (!first) break;
+                long now = System.currentTimeMillis();
+                if (dblTop && now - lastPlayPress < 450) {
+                    lastPlayPress = 0;
+                    if (countLeft > 0) togglePlay();
+                    if (playing) setPlaying(false);
+                    toTop();
+                    showStatus("⏮  Double press — shurute");
+                } else {
+                    lastPlayPress = now;
+                    togglePlay();
+                }
+                break;
             case Keys.BACK: jump(-1); break;
             case Keys.FWD: jump(1); break;
             case Keys.FASTER: changeSpeed(1); break;
@@ -764,6 +990,7 @@ public class PrompterActivity extends Activity
     protected void onPause() {
         super.onPause();
         if (im != null) im.unregisterInputDeviceListener(this);
+        if (voice != null) voice.stop();
         if (playing) setPlaying(false);
         handler.removeCallbacks(tick);
         countLeft = 0;

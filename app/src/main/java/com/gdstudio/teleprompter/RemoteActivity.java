@@ -31,6 +31,8 @@ public class RemoteActivity extends Activity
     private final TextView[] keyLabels = new TextView[Keys.LAST + 1];
     private int learning = 0;
     private InputManager im;
+    private TextView wifiTv, wifiBtn;
+    private ImageView qrIv;
     private BleRemote ble;
 
     private final List<String> foundAddr = new ArrayList<>();
@@ -108,6 +110,36 @@ public class RemoteActivity extends Activity
         });
         c1.addView(pair);
         c1.addView(note("Selfie remote, presentation clicker, keyboard — egulo phone settings e pair hoy."));
+
+        // Phone as remote (WiFi)
+        LinearLayout cw = card(box, "📱 Arekta phone ke remote banan (WiFi)");
+        wifiTv = new TextView(this);
+        wifiTv.setTextSize(15);
+        wifiTv.setTextColor(Color.BLACK);
+        cw.addView(wifiTv);
+        qrIv = new ImageView(this);
+        LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(dp(200), dp(200));
+        qlp.gravity = Gravity.CENTER_HORIZONTAL;
+        qlp.topMargin = dp(8);
+        cw.addView(qrIv, qlp);
+        wifiBtn = button("", Color.rgb(255, 196, 0), Color.BLACK);
+        wifiBtn.setOnClickListener(v -> {
+            if (RemoteServer.running()) RemoteServer.stop();
+            else RemoteServer.start(this);
+            wifiTv.postDelayed(this::refreshWifi, 500);
+        });
+        cw.addView(wifiBtn);
+        cw.addView(note("Duto phone ek WiFi te rakhun (ba ek phone er hotspot e arekta connect korun). "
+                + "Arekta phone e QR scan korun ba link ta browser e khulun — sekhan theke play, speed, "
+                + "font control korte parben. Teleprompter phone e script khula rakhun."));
+
+        LinearLayout cd = card(box, "Shortcut");
+        android.widget.CheckBox dbl = new android.widget.CheckBox(this);
+        dbl.setText("Play button 2 bar taratari chaple → shurute jabe");
+        dbl.setTextColor(Color.BLACK);
+        dbl.setChecked(Store.prefs(this).getBoolean("dbl_top", false));
+        dbl.setOnCheckedChangeListener((b, c) -> Store.prefs(this).edit().putBoolean("dbl_top", c).apply());
+        cd.addView(dbl);
 
         // 3. Test
         LinearLayout c2 = card(box, "Remote test");
@@ -304,6 +336,20 @@ public class RemoteActivity extends Activity
         }
     }
 
+    private void refreshWifi() {
+        boolean on = RemoteServer.running();
+        String url = RemoteServer.url();
+        wifiBtn.setText(on ? "⏹  Phone remote bondho korun" : "▶  Phone remote chalu korun");
+        if (on && url != null) {
+            wifiTv.setText("✅ Chalu — arekta phone e khulun:\n" + url);
+            qrIv.setImageBitmap(RemoteServer.qr(url, 400));
+            qrIv.setVisibility(android.view.View.VISIBLE);
+        } else {
+            wifiTv.setText(url == null ? "Phone WiFi / hotspot e connect nei" : "Bondho");
+            qrIv.setVisibility(android.view.View.GONE);
+        }
+    }
+
     private void refreshDevices() {
         devList.removeAllViews();
         List<String> names = Keys.remotes();
@@ -347,6 +393,7 @@ public class RemoteActivity extends Activity
         im.registerInputDeviceListener(this, null);
         ble.setRawListener(this);
         refreshDevices();
+        refreshWifi();
     }
 
     @Override

@@ -89,6 +89,7 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
     }
 
     boolean isConnected() { return connected; }
+    Activity currentActivity() { return current; }
     String savedName() { return Store.prefs(ctx).getString("ble_name", ""); }
     String savedAddr() { return Store.prefs(ctx).getString("ble_addr", ""); }
 

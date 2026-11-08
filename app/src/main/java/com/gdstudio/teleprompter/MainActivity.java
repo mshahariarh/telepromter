@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.text.TextUtils;
@@ -36,6 +37,8 @@ public class MainActivity extends Activity {
     private LinearLayout list;
     private TextView folderBtn;
     private ImageView bt;
+    private EditText searchBox;
+    private boolean sortByName = false;
     private String filter = ""; // "" = all folders
 
     interface StrCb { void on(String s); }
@@ -62,13 +65,28 @@ public class MainActivity extends Activity {
         t.setTextSize(20);
         t.setTypeface(Typeface.DEFAULT_BOLD);
         header.addView(t, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
-        bt = new ImageView(this);
-        bt.setImageResource(R.drawable.ic_bluetooth);
-        bt.setPadding(dp(14), dp(14), dp(14), dp(14));
-        bt.setOnClickListener(v -> startActivity(new Intent(this, RemoteActivity.class)));
-        header.addView(bt, new FrameLayout.LayoutParams(dp(52), dp(52),
-                Gravity.END | Gravity.CENTER_VERTICAL));
+        LinearLayout icons = new LinearLayout(this);
+        icons.setGravity(Gravity.CENTER_VERTICAL);
+        icons.addView(headIcon(R.drawable.ic_search, v -> toggleSearch()));
+        bt = headIcon(R.drawable.ic_bluetooth, v -> startActivity(new Intent(this, RemoteActivity.class)));
+        icons.addView(bt);
+        header.addView(icons, new FrameLayout.LayoutParams(-2, -1, Gravity.END | Gravity.CENTER_VERTICAL));
+        header.addView(headIcon(R.drawable.ic_more, v -> menu()),
+                new FrameLayout.LayoutParams(dp(48), dp(52), Gravity.START | Gravity.CENTER_VERTICAL));
         root.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
+
+        searchBox = new EditText(this);
+        searchBox.setHint("Script khujun…");
+        searchBox.setSingleLine(true);
+        searchBox.setTextColor(Color.BLACK);
+        searchBox.setVisibility(View.GONE);
+        searchBox.setPadding(dp(16), dp(12), dp(16), dp(12));
+        searchBox.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            public void onTextChanged(CharSequence s, int a, int b, int c) { render(); }
+            public void afterTextChanged(android.text.Editable e) {}
+        });
+        root.addView(searchBox, new LinearLayout.LayoutParams(-1, -2));
 
         // List
         ScrollView sv = new ScrollView(this);
@@ -108,6 +126,7 @@ public class MainActivity extends Activity {
         root.addView(bottom);
 
         setContentView(root);
+        handleShare(getIntent());
     }
 
     @Override
@@ -123,11 +142,14 @@ public class MainActivity extends Activity {
         bt.setColorFilter(remoteOn ? Color.rgb(0, 230, 118) : Color.WHITE);
         folderBtn.setText(filter.isEmpty() ? "All" : "📁 " + filter);
         List<Store.Script> all = Store.all(this);
-        Collections.sort(all, (a, b) -> Long.compare(b.time, a.time));
+        if (sortByName) Collections.sort(all, (a, b) -> a.title.compareToIgnoreCase(b.title));
+        else Collections.sort(all, (a, b) -> Long.compare(b.time, a.time));
+        String q = searchBox.getText().toString().trim().toLowerCase();
         SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
         int shown = 0;
         for (Store.Script s : all) {
             if (!filter.isEmpty() && !filter.equals(s.folder)) continue;
+            if (!q.isEmpty() && !(s.title + "\n" + s.text).toLowerCase().contains(q)) continue;
             shown++;
             list.addView(row(s, f));
         }
@@ -140,6 +162,13 @@ public class MainActivity extends Activity {
             e.setPadding(dp(24), dp(80), dp(24), dp(24));
             list.addView(e);
         }
+        TextView dev = new TextView(this);
+        dev.setText("GD Teleprompter  •  Developer: M. Shahariar");
+        dev.setTextColor(Color.rgb(160, 160, 160));
+        dev.setTextSize(12);
+        dev.setGravity(Gravity.CENTER);
+        dev.setPadding(0, dp(24), 0, dp(24));
+        list.addView(dev);
     }
 
     private View row(Store.Script s, SimpleDateFormat f) {
@@ -163,6 +192,7 @@ public class MainActivity extends Activity {
         TextView date = new TextView(this);
         String d = f.format(new Date(s.time));
         if (s.folder != null && !s.folder.isEmpty()) d += "   •   📁 " + s.folder;
+        d += "   •   " + readTime(s.text);
         date.setText(d);
         date.setTextColor(Color.GRAY);
         date.setTextSize(12);
@@ -278,6 +308,163 @@ public class MainActivity extends Activity {
                     Store.put(this, s);
                     render();
                 })
+                .show();
+    }
+
+    // ---------- v5: header, menu, import, backup, share ----------
+
+    static final int REQ_IMPORT = 21, REQ_BACKUP_SAVE = 22, REQ_BACKUP_LOAD = 23;
+
+    private ImageView headIcon(int res, View.OnClickListener l) {
+        ImageView iv = new ImageView(this);
+        iv.setImageResource(res);
+        iv.setPadding(dp(13), dp(14), dp(13), dp(14));
+        iv.setOnClickListener(l);
+        iv.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(52)));
+        return iv;
+    }
+
+    private void toggleSearch() {
+        boolean show = searchBox.getVisibility() != View.VISIBLE;
+        searchBox.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) searchBox.requestFocus();
+        else searchBox.setText("");
+        render();
+    }
+
+    private String readTime(String t) {
+        int words = (t == null || t.trim().isEmpty()) ? 0 : t.trim().split("\\s+").length;
+        int min = Math.round(words / 130f);
+        return words + " shobdo · " + (min < 1 ? "<1" : String.valueOf(min)) + " min";
+    }
+
+    private void menu() {
+        String[] items = {"📥  File import (txt / Word / PDF)", "💾  Backup save korun",
+                "♻  Backup theke ferot anun", sortByName ? "↕  Sort: notun age" : "↕  Sort: nam (A-Z)",
+                "ⓘ  About"};
+        new AlertDialog.Builder(this)
+                .setItems(items, (d, w) -> {
+                    if (w == 0) pick(REQ_IMPORT, new String[]{"text/plain", "application/pdf",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+                    else if (w == 1) {
+                        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                        i.addCategory(Intent.CATEGORY_OPENABLE);
+                        i.setType("application/json");
+                        i.putExtra(Intent.EXTRA_TITLE, "GD-Teleprompter-backup-"
+                                + new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()) + ".json");
+                        try {
+                            startActivityForResult(i, REQ_BACKUP_SAVE);
+                        } catch (Exception e) {
+                            toast("File save khola jacche na");
+                        }
+                    } else if (w == 2) pick(REQ_BACKUP_LOAD, new String[]{"application/json", "text/plain",
+                            "application/octet-stream"});
+                    else if (w == 3) {
+                        sortByName = !sortByName;
+                        render();
+                    } else about();
+                })
+                .show();
+    }
+
+    private void pick(int req, String[] mimes) {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES, mimes);
+        try {
+            startActivityForResult(i, req);
+        } catch (Exception e) {
+            toast("File picker khola jacche na");
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (res != RESULT_OK || data == null || data.getData() == null) return;
+        Uri u = data.getData();
+        if (req == REQ_IMPORT) importUri(u);
+        else if (req == REQ_BACKUP_SAVE) {
+            try (java.io.OutputStream o = getContentResolver().openOutputStream(u)) {
+                o.write(Importer.exportJson(this).getBytes("UTF-8"));
+                toast("Backup save hoyeche ✓");
+            } catch (Exception e) {
+                toast("Backup save hoyni");
+            }
+        } else if (req == REQ_BACKUP_LOAD) {
+            try {
+                int n = Importer.importJson(this, Importer.txt(this, u));
+                toast(n + " ta script ferot ana hoyeche ✓");
+                render();
+            } catch (Exception e) {
+                toast("Backup file thik na");
+            }
+        }
+    }
+
+    private void importUri(Uri u) {
+        toast("Import hocche…");
+        new Thread(() -> {
+            try {
+                Importer.Result r = Importer.read(this, u);
+                runOnUiThread(() -> saveImported(r.title, r.text));
+            } catch (Exception e) {
+                runOnUiThread(() -> toast("Import hoyni: " + e.getMessage()));
+            }
+        }).start();
+    }
+
+    private void saveImported(String title, String text) {
+        Store.Script s = new Store.Script();
+        s.id = Store.newId();
+        String t = title == null || title.trim().isEmpty() ? "Imported" : title.trim();
+        s.title = t.length() > 40 ? t.substring(0, 40) + "…" : t;
+        s.folder = filter;
+        s.text = text;
+        s.time = System.currentTimeMillis();
+        Store.put(this, s);
+        render();
+        toast("✓ \"" + s.title + "\" add hoyeche");
+        startActivity(new Intent(this, EditorActivity.class).putExtra("id", s.id));
+    }
+
+    private void handleShare(Intent in) {
+        if (in == null) return;
+        String act = in.getAction();
+        if (Intent.ACTION_SEND.equals(act)) {
+            Uri u = in.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (u != null) importUri(u);
+            else {
+                String t = in.getStringExtra(Intent.EXTRA_TEXT);
+                if (t != null && !t.trim().isEmpty()) {
+                    String sub = in.getStringExtra(Intent.EXTRA_SUBJECT);
+                    saveImported(sub != null ? sub : t.trim().split("\n")[0], t);
+                }
+            }
+        } else if (Intent.ACTION_VIEW.equals(act) && in.getData() != null) {
+            importUri(in.getData());
+        }
+        setIntent(new Intent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        handleShare(i);
+    }
+
+    private void toast(String t) {
+        android.widget.Toast.makeText(this, t, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    private void about() {
+        new AlertDialog.Builder(this)
+                .setTitle("GD Teleprompter")
+                .setMessage("Version 5.0\n\nDeveloper: M. Shahariar\n\n"
+                        + "Remote (Feelworld, Bluetooth, phone), voice scroll, Bangla font, "
+                        + "PAUSE marker, file import o backup soho teleprompter app.")
+                .setPositiveButton("OK", null)
                 .show();
     }
 
