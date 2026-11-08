@@ -69,6 +69,12 @@ public class PrompterActivity extends Activity
     private final java.util.ArrayList<Integer> pauseOffsets = new java.util.ArrayList<>();
     private long lastPlayPress = 0;
     private float prevPos = 0f;
+    private int readColor, readEnd = -1, lastVoiceY = -1;
+    private android.text.style.ForegroundColorSpan readSpan;
+    private android.animation.ValueAnimator scrollAnim;
+    private LinearLayout readRow;
+    private static final int[] READ_COLORS = {0, Color.rgb(120, 120, 130), Color.rgb(255, 214, 0),
+            Color.rgb(0, 230, 118), Color.rgb(0, 229, 255), Color.rgb(255, 145, 0), Color.rgb(229, 57, 53)};
 
     private int panel = 0; // 0 none, 1 text, 2 speed
     private boolean playing = false;
@@ -187,7 +193,14 @@ public class PrompterActivity extends Activity
         });
         scroll.setOnTouchListener((v, e) -> {
             gd.onTouchEvent(e);
+            int am = e.getActionMasked();
+            if (am == MotionEvent.ACTION_DOWN && scrollAnim != null) scrollAnim.cancel();
+            if (am == MotionEvent.ACTION_UP || am == MotionEvent.ACTION_CANCEL)
+                scroll.postDelayed(this::resyncVoice, 700);
             return false;
+        });
+        scroll.getViewTreeObserver().addOnScrollChangedListener(() -> {
+            if (voice == null || !voice.isActive()) markReadAtGuide();
         });
 
         setContentView(root);
@@ -215,6 +228,7 @@ public class PrompterActivity extends Activity
         focus = prefs.getBoolean("focus", false);
         dblTop = prefs.getBoolean("dbl_top", false);
         fontFace = prefs.getString("font_face", Fonts.SYSTEM);
+        readColor = prefs.getInt("readColor", 0);
     }
 
     private void saveSettings() {
@@ -227,13 +241,17 @@ public class PrompterActivity extends Activity
                 .putBoolean("loop", loop).putBoolean("landscape", landscape)
                 .putInt("countdown2", countdown)
                 .putBoolean("focus", focus).putString("font_face", fontFace)
+                .putInt("readColor", readColor)
                 .apply();
     }
 
     private void loadText() {
         String body = script == null ? "" : script.text;
         if (body == null || body.trim().isEmpty()) body = "(Script khali — upore ✎ chepe likhun)";
-        text.setText(markup(body));
+        readEnd = -1;
+        lastVoiceY = -1;
+        readSpan = null;
+        text.setText(markup(body), TextView.BufferType.SPANNABLE);
         voice.setText(body);
         titleTv.setText(script == null ? "Teleprompter" : script.title);
         scroll.post(this::updateRemain);
@@ -420,6 +438,25 @@ public class PrompterActivity extends Activity
         textSwatches = swatchRow(box, TEXT_COLORS, true);
         box.addView(label("Background"));
         bgSwatches = swatchRow(box, BG_COLORS, false);
+        box.addView(label("Pora lekhar rong (jototuku pora shesh)"));
+        HorizontalScrollView rhs = new HorizontalScrollView(this);
+        rhs.setHorizontalScrollBarEnabled(false);
+        readRow = new LinearLayout(this);
+        readRow.setPadding(0, dp(4), 0, 0);
+        for (int c : READ_COLORS) {
+            TextView sw = new TextView(this);
+            sw.setTag(c);
+            sw.setGravity(Gravity.CENTER);
+            sw.setTextSize(11);
+            sw.setTextColor(Color.WHITE);
+            if (c == 0) sw.setText("Auto");
+            sw.setOnClickListener(v -> { readColor = c; applyStyle(false); });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(c == 0 ? dp(52) : dp(38), dp(38));
+            lp.rightMargin = dp(10);
+            readRow.addView(sw, lp);
+        }
+        rhs.addView(readRow);
+        box.addView(rhs);
 
         LinearLayout toggles = new LinearLayout(this);
         toggles.setPadding(0, dp(14), 0, 0);
@@ -585,6 +622,10 @@ public class PrompterActivity extends Activity
 
         markSwatches(textSwatches, textColor);
         markSwatches(bgSwatches, bgColor);
+        markReadRow();
+        int re = readEnd;
+        readEnd = -1;
+        if (re >= 0) markRead(re);
         chipState(boldBtn, bold);
         chipState(alignBtn, center);
         chipState(focusBtn, focus);
@@ -671,12 +712,14 @@ public class PrompterActivity extends Activity
     private void toTop() {
         scroll.scrollTo(0, 0);
         pos = 0;
+        resyncVoice();
     }
 
     private void toEnd() {
         int max = Math.max(0, text.getHeight() - scroll.getHeight());
         scroll.scrollTo(0, max);
         pos = max;
+        resyncVoice();
     }
 
     private void toggleRotate() {
@@ -698,8 +741,10 @@ public class PrompterActivity extends Activity
 
     private void jump(int direction) {
         int step = (int) (scroll.getHeight() * 0.35f) * direction;
+        if (scrollAnim != null) scrollAnim.cancel();
         scroll.scrollBy(0, step);
         pos = scroll.getScrollY();
+        resyncVoice();
         showStatus(direction > 0 ? "▼  Samne" : "▲  Pichone");
     }
 
@@ -753,6 +798,7 @@ public class PrompterActivity extends Activity
                 scroll.scrollTo(0, (int) pos);
             }
         }
+        markReadAtGuide();
         lastFrame = frameTimeNanos;
         Choreographer.getInstance().postFrameCallback(this);
     }
@@ -870,10 +916,90 @@ public class PrompterActivity extends Activity
     public void voiceGoTo(int off) {
         android.text.Layout l = text.getLayout();
         if (l == null) return;
-        int y = l.getLineTop(l.getLineForOffset(Math.min(off, text.length())));
-        scroll.smoothScrollTo(0, y);
-        pos = y;
+        int n = text.length();
+        off = Math.min(off, n);
+        // colour everything already read, up to the end of the spoken word
+        int end = off;
+        while (end < n && VoiceScroller.isWordChar(text.getText().charAt(end))) end++;
+        markRead(end);
+        int y = l.getLineTop(l.getLineForOffset(off));
+        if (y != lastVoiceY) {
+            lastVoiceY = y;
+            smoothTo(y);
+        }
+    }
+
+    /** Gentle, eased scroll so the eyes can follow (no jumps). */
+    private void smoothTo(int y) {
+        if (scrollAnim != null) scrollAnim.cancel();
+        int from = scroll.getScrollY();
+        int dist = Math.abs(y - from);
+        if (dist == 0) return;
+        scrollAnim = android.animation.ValueAnimator.ofInt(from, y);
+        scrollAnim.setDuration(Math.max(450, Math.min(1100, dist * 3)));
+        scrollAnim.setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f));
+        scrollAnim.addUpdateListener(a -> {
+            int v = (Integer) a.getAnimatedValue();
+            scroll.scrollTo(0, v);
+            pos = v;
+        });
+        scrollAnim.start();
         updateRemain();
+    }
+
+    /** Colour text from the start up to 'end' with the "already read" colour. */
+    private void markRead(int end) {
+        if (end == readEnd || !(text.getText() instanceof android.text.Spannable)) return;
+        android.text.Spannable sp = (android.text.Spannable) text.getText();
+        if (readSpan != null) sp.removeSpan(readSpan);
+        readSpan = null;
+        readEnd = end;
+        end = Math.min(end, sp.length());
+        if (end <= 0) return;
+        int c = readColor != 0 ? readColor : mix(textColor, bgColor, 0.6f);
+        readSpan = new android.text.style.ForegroundColorSpan(c);
+        sp.setSpan(readSpan, 0, end, 33);
+    }
+
+    /** During normal scrolling: lines above the guide line count as read. */
+    private void markReadAtGuide() {
+        android.text.Layout l = text.getLayout();
+        if (l == null) return;
+        markRead(l.getLineStart(l.getLineForVertical(Math.max(0, scroll.getScrollY()))));
+    }
+
+    /** After manual scrolling / jumps, voice matching restarts from the line at the guide. */
+    private void resyncVoice() {
+        android.text.Layout l = text.getLayout();
+        if (l == null) return;
+        int start = l.getLineStart(l.getLineForVertical(Math.max(0, scroll.getScrollY())));
+        markRead(start);
+        lastVoiceY = -1;
+        if (voice != null && voice.isActive()) voice.setPositionFromOffset(start);
+    }
+
+    private static int mix(int a, int b, float t) {
+        return Color.rgb((int) (Color.red(a) + (Color.red(b) - Color.red(a)) * t),
+                (int) (Color.green(a) + (Color.green(b) - Color.green(a)) * t),
+                (int) (Color.blue(a) + (Color.blue(b) - Color.blue(a)) * t));
+    }
+
+    private void markReadRow() {
+        if (readRow == null) return;
+        for (int i = 0; i < readRow.getChildCount(); i++) {
+            View v = readRow.getChildAt(i);
+            int c = (Integer) v.getTag();
+            GradientDrawable d = new GradientDrawable();
+            if (c == 0) {
+                d.setCornerRadius(dp(19));
+                d.setColor(mix(textColor, bgColor, 0.6f));
+            } else {
+                d.setShape(GradientDrawable.OVAL);
+                d.setColor(c);
+            }
+            d.setStroke(c == readColor ? dp(4) : dp(1), c == readColor ? ACCENT : Color.rgb(90, 95, 110));
+            v.setBackground(d);
+        }
     }
 
     @Override

@@ -461,7 +461,7 @@ public class MainActivity extends Activity {
     private void about() {
         new AlertDialog.Builder(this)
                 .setTitle("GD Teleprompter")
-                .setMessage("Version 5.0\n\nDeveloper: M. Shahariar\n\n"
+                .setMessage("Version 5.1\n\nDeveloper: M. Shahariar\n\n"
                         + "Remote (Feelworld, Bluetooth, phone), voice scroll, Bangla font, "
                         + "PAUSE marker, file import o backup soho teleprompter app.")
                 .setPositiveButton("OK", null)

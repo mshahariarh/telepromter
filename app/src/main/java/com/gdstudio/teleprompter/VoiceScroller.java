@@ -179,8 +179,31 @@ public class VoiceScroller implements RecognitionListener {
         }
         int need = tail >= 2 ? 2 : 1;
         if (tail == 1 && hw.get(0).length() < 3) return false;
+        boolean anywhere = false;
+        if ((bestJ < 0 || bestScore < need) && tail >= 3) {
+            // lost (e.g. after scrolling): look through the whole script for a strong match
+            int best2 = -1, score2 = 0;
+            for (int j = 0; j < words.length; j++) {
+                int score = 0;
+                for (int m = 0; m < tail; m++) {
+                    int wi = j - m, hi = hw.size() - 1 - m;
+                    if (wi < 0) break;
+                    if (similar(words[wi], hw.get(hi))) score++;
+                }
+                if (score > score2 || (score == score2 && score > 0
+                        && Math.abs(j - cur) < Math.abs(best2 - cur))) {
+                    score2 = score;
+                    best2 = j;
+                }
+            }
+            if (score2 >= 3) {
+                bestJ = best2;
+                bestScore = score2;
+                anywhere = true;
+            }
+        }
         if (bestJ < 0 || bestScore < need) return false;
-        if (bestJ >= cur) {
+        if (bestJ >= cur || anywhere) {
             cur = bestJ;
             final int off = offs[bestJ];
             h.post(() -> target.voiceGoTo(off));
