@@ -22,6 +22,22 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Download Bangla fonts (Google Fonts, OFL)
+        run: |
+          mkdir -p app/src/main/assets/fonts
+          cd app/src/main/assets/fonts
+          base=https://github.com/google/fonts/raw/main/ofl
+          get() { curl -fsSL -o "$1" "$base/$2" || rm -f "$1"; }
+          get Hind_Siliguri.ttf hindsiliguri/HindSiliguri-Regular.ttf
+          get Noto_Sans_Bengali.ttf "notosansbengali/NotoSansBengali%5Bwdth,wght%5D.ttf"
+          get Noto_Serif_Bengali.ttf "notoserifbengali/NotoSerifBengali%5Bwdth,wght%5D.ttf"
+          get Anek_Bangla.ttf "anekbangla/AnekBangla%5Bwdth,wght%5D.ttf"
+          get Baloo_Da_2.ttf "balooda2/BalooDa2%5Bwght%5D.ttf"
+          get Tiro_Bangla.ttf tirobangla/TiroBangla-Regular.ttf
+          get Galada.ttf galada/Galada-Regular.ttf
+          get Mina.ttf mina/Mina-Regular.ttf
+          ls -la
+
       - name: Build debug APK
         run: gradle assembleDebug
 
