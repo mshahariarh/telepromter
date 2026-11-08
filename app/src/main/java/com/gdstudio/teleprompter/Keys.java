@@ -12,13 +12,17 @@ import java.util.List;
 /** Remote button mapping (defaults + user-learned buttons) and connected-remote detection. */
 public class Keys {
 
-    static final int NONE = 0, PLAY = 1, BACK = 2, FWD = 3, FASTER = 4, SLOWER = 5, EXIT = 6;
+    static final int NONE = 0, PLAY = 1, BACK = 2, FWD = 3, FASTER = 4, SLOWER = 5, EXIT = 6,
+            TOP = 7, FONT_UP = 8, FONT_DN = 9, MIRROR = 10, LOOP = 11;
+    /** last action that can be learned in "Button set" */
+    static final int LAST = LOOP;
     static final String[] NAMES = {"", "Play / Pause", "Pichone (back)", "Samne (forward)",
-            "Speed +", "Speed −", "Exit"};
+            "Speed +", "Speed −", "Exit (prompter bondho)", "Shurute jao", "Font boro",
+            "Font choto", "Mirror on/off", "Loop on/off"};
 
     static int actionFor(Context c, int keyCode) {
         SharedPreferences p = Store.prefs(c);
-        for (int a = PLAY; a <= SLOWER; a++) if (p.getInt("km_" + a, -1) == keyCode) return a;
+        for (int a = PLAY; a <= LAST; a++) if (p.getInt("km_" + a, -1) == keyCode) return a;
         switch (keyCode) {
             case KeyEvent.KEYCODE_VOLUME_UP:
             case KeyEvent.KEYCODE_SPACE:
@@ -61,7 +65,7 @@ public class Keys {
     static void assign(Context c, int action, int keyCode) {
         SharedPreferences p = Store.prefs(c);
         SharedPreferences.Editor e = p.edit();
-        for (int a = PLAY; a <= SLOWER; a++)
+        for (int a = PLAY; a <= LAST; a++)
             if (p.getInt("km_" + a, -1) == keyCode) e.remove("km_" + a);
         e.putInt("km_" + action, keyCode).apply();
     }
@@ -72,7 +76,7 @@ public class Keys {
 
     static void reset(Context c) {
         SharedPreferences.Editor e = Store.prefs(c).edit();
-        for (int a = PLAY; a <= SLOWER; a++) e.remove("km_" + a);
+        for (int a = PLAY; a <= LAST; a++) e.remove("km_" + a);
         e.apply();
     }
 

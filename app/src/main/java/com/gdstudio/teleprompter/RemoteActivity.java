@@ -28,7 +28,7 @@ public class RemoteActivity extends Activity
 
     private LinearLayout devList;
     private TextView testTv, bleStatus;
-    private final TextView[] keyLabels = new TextView[6];
+    private final TextView[] keyLabels = new TextView[Keys.LAST + 1];
     private int learning = 0;
     private InputManager im;
     private BleRemote ble;
@@ -125,8 +125,8 @@ public class RemoteActivity extends Activity
 
         // 4. Learn buttons
         LinearLayout c3 = card(box, "Button set");
-        c3.addView(note("\"Set\" chepe remote er je button ta ei kaj korbe sheta chapun. Feelworld remote e ekbar korlei hobe."));
-        for (int a = Keys.PLAY; a <= Keys.SLOWER; a++) {
+        c3.addView(note("\"Set\" chepe remote er je button (OK, Select, Back, arrow…) ei kaj korbe sheta chapun. Ekbar korlei mone thakbe."));
+        for (int a = Keys.PLAY; a <= Keys.LAST; a++) {
             final int action = a;
             LinearLayout r = new LinearLayout(this);
             r.setGravity(Gravity.CENTER_VERTICAL);
@@ -286,7 +286,7 @@ public class RemoteActivity extends Activity
     }
 
     private void refreshLabels() {
-        for (int a = Keys.PLAY; a <= Keys.SLOWER; a++) {
+        for (int a = Keys.PLAY; a <= Keys.LAST; a++) {
             int k = Keys.custom(this, a);
             boolean b = ble.mapped(a) != null;
             if (learning == a) {

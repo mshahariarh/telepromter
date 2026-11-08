@@ -195,7 +195,7 @@ public class PrompterActivity extends Activity
         center = prefs.getBoolean("center", false);
         loop = prefs.getBoolean("loop", false);
         landscape = prefs.getBoolean("landscape", false);
-        countdown = prefs.getInt("countdown", 3);
+        countdown = prefs.getInt("countdown2", 0); // off by default
     }
 
     private void saveSettings() {
@@ -206,7 +206,7 @@ public class PrompterActivity extends Activity
                 .putInt("textColor", textColor).putInt("bgColor", bgColor)
                 .putBoolean("bold", bold).putBoolean("center", center)
                 .putBoolean("loop", loop).putBoolean("landscape", landscape)
-                .putInt("countdown", countdown)
+                .putInt("countdown2", countdown)
                 .apply();
     }
 
@@ -674,19 +674,60 @@ public class PrompterActivity extends Activity
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int action = Keys.actionFor(this, event.getKeyCode());
-        if (action == Keys.NONE) return super.dispatchKeyEvent(event);
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            boolean first = event.getRepeatCount() == 0;
-            switch (action) {
-                case Keys.PLAY: if (first) togglePlay(); break;
-                case Keys.BACK: jump(-1); break;
-                case Keys.FWD: jump(1); break;
-                case Keys.FASTER: changeSpeed(1); break;
-                case Keys.SLOWER: changeSpeed(-1); break;
-                case Keys.EXIT: finish(); break;
-            }
+        if (action == Keys.NONE) {
+            // show unknown remote buttons so the user can see the signal arrives
+            InputDevice dev = event.getDevice();
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0
+                    && dev != null && !dev.isVirtual()
+                    && event.getKeyCode() != KeyEvent.KEYCODE_BACK
+                    && event.getKeyCode() != KeyEvent.KEYCODE_HOME)
+                showStatus("Remote button: " + Keys.keyName(event.getKeyCode())
+                        + " — Bluetooth icon → Button set e Set korun");
+            return super.dispatchKeyEvent(event);
         }
+        if (event.getAction() == KeyEvent.ACTION_DOWN) doAction(action, event.getRepeatCount() == 0);
         return true;
+    }
+
+    /** One place for every remote/keyboard action. */
+    void doAction(int action, boolean first) {
+        switch (action) {
+            case Keys.PLAY: if (first) togglePlay(); break;
+            case Keys.BACK: jump(-1); break;
+            case Keys.FWD: jump(1); break;
+            case Keys.FASTER: changeSpeed(1); break;
+            case Keys.SLOWER: changeSpeed(-1); break;
+            case Keys.EXIT: if (first) finish(); break;
+            case Keys.TOP:
+                if (first) { toTop(); showStatus("⏮  Shurute"); }
+                break;
+            case Keys.FONT_UP:
+                fontSize = Math.min(140, fontSize + 4);
+                applyStyle(true);
+                showStatus("Font " + fontSize);
+                break;
+            case Keys.FONT_DN:
+                fontSize = Math.max(14, fontSize - 4);
+                applyStyle(true);
+                showStatus("Font " + fontSize);
+                break;
+            case Keys.MIRROR:
+                if (first) {
+                    mirror = !mirror;
+                    applyStyle(false);
+                    updateToggles();
+                    showStatus(mirror ? "Mirror ON" : "Mirror OFF");
+                }
+                break;
+            case Keys.LOOP:
+                if (first) {
+                    loop = !loop;
+                    saveSettings();
+                    updateToggles();
+                    showStatus(loop ? "Loop ON" : "Loop OFF");
+                }
+                break;
+        }
     }
 
     @Override

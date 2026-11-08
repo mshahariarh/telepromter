@@ -253,10 +253,14 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
         if (sig.equals(lastSig) && now - lastTime < 120) return;
         lastSig = sig;
         lastTime = now;
-        int action = actionFor(sig);
+        int mappedAction = actionFor(sig);
+        // nothing learned yet: any remote button = Play/Pause, so it works right away
+        int action = (mappedAction == Keys.NONE && !hasAnyMap()) ? Keys.PLAY : mappedAction;
         main.post(() -> {
             if (rawListener != null) {
-                rawListener.onBleRaw(sig, action);
+                rawListener.onBleRaw(sig, mappedAction);
+            } else if (current instanceof PrompterActivity && action != Keys.NONE) {
+                ((PrompterActivity) current).doAction(action, true);
             } else if (current != null && action != Keys.NONE) {
                 int code = codeFor(action);
                 current.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, code));
@@ -278,7 +282,7 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
 
     int actionFor(String sig) {
         SharedPreferences p = Store.prefs(ctx);
-        for (int a = Keys.PLAY; a <= Keys.SLOWER; a++)
+        for (int a = Keys.PLAY; a <= Keys.LAST; a++)
             if (sig.equals(p.getString("bm_" + a, null))) return a;
         return Keys.NONE;
     }
@@ -286,9 +290,14 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
     void assign(int action, String sig) {
         SharedPreferences p = Store.prefs(ctx);
         SharedPreferences.Editor e = p.edit();
-        for (int a = Keys.PLAY; a <= Keys.SLOWER; a++)
+        for (int a = Keys.PLAY; a <= Keys.LAST; a++)
             if (sig.equals(p.getString("bm_" + a, null))) e.remove("bm_" + a);
         e.putString("bm_" + action, sig).apply();
+    }
+
+    boolean hasAnyMap() {
+        for (int a = Keys.PLAY; a <= Keys.LAST; a++) if (mapped(a) != null) return true;
+        return false;
     }
 
     String mapped(int action) {
@@ -297,7 +306,7 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
 
     void resetMap() {
         SharedPreferences.Editor e = Store.prefs(ctx).edit();
-        for (int a = Keys.PLAY; a <= Keys.SLOWER; a++) e.remove("bm_" + a);
+        for (int a = Keys.PLAY; a <= Keys.LAST; a++) e.remove("bm_" + a);
         e.apply();
     }
 
