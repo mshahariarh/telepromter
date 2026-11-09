@@ -164,7 +164,7 @@ public class RemoteServer {
             + "<button onclick='a(5)'>&minus; Speed</button><button onclick='a(4)'>+ Speed</button>"
             + "<button onclick='a(9)'>A&minus; Font</button><button onclick='a(8)'>A+ Font</button>"
             + "<button onclick='a(7)'>&#9198; Start</button><button onclick='a(10)'>&#8651; Mirror</button></div>"
-            + "<p>Developer: M. Shahariar</p>"
+            + "<p>Created by M. Shahariar</p>"
             + "<script>function a(x){var s=document.getElementById('s');"
             + "fetch('/a?x='+x+'&t='+Date.now()).then(function(){s.textContent='✓'})"
             + ".catch(function(){s.textContent='Not connected - are both phones on the same WiFi?'});"

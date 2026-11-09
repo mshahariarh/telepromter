@@ -13,12 +13,14 @@ import java.util.List;
 public class Keys {
 
     static final int NONE = 0, PLAY = 1, BACK = 2, FWD = 3, FASTER = 4, SLOWER = 5, EXIT = 6,
-            TOP = 7, FONT_UP = 8, FONT_DN = 9, MIRROR = 10, LOOP = 11, SELECT = 12;
+            TOP = 7, FONT_UP = 8, FONT_DN = 9, MIRROR = 10, LOOP = 11, SELECT = 12,
+            NAV_UP = 13, NAV_DOWN = 14, NAV_LEFT = 15, NAV_RIGHT = 16;
     /** last action that can be learned in "Button set" */
-    static final int LAST = SELECT;
+    static final int LAST = NAV_RIGHT;
     static final String[] NAMES = {"", "Play / Pause", "Scroll back", "Scroll forward",
             "Speed +", "Speed −", "Exit prompter", "Go to start", "Font bigger",
-            "Font smaller", "Mirror on/off", "Loop on/off", "Select / OK (menu)"};
+            "Font smaller", "Mirror on/off", "Loop on/off", "Select / OK (menu)",
+            "Menu up", "Menu down", "Menu left", "Menu right"};
 
     static int actionFor(Context c, int keyCode) {
         SharedPreferences p = Store.prefs(c);

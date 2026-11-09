@@ -59,9 +59,13 @@ public class RemoteNav {
 
     static int joyDir(MotionEvent e) {
         float x = e.getAxisValue(MotionEvent.AXIS_X), y = e.getAxisValue(MotionEvent.AXIS_Y);
-        float hx = e.getAxisValue(MotionEvent.AXIS_HAT_X), hy = e.getAxisValue(MotionEvent.AXIS_HAT_Y);
-        if (Math.abs(hx) + Math.abs(hy) > Math.abs(x) + Math.abs(y)) { x = hx; y = hy; }
-        if (Math.max(Math.abs(x), Math.abs(y)) < 0.5f) return 0;
+        float[][] alt = {
+                {e.getAxisValue(MotionEvent.AXIS_HAT_X), e.getAxisValue(MotionEvent.AXIS_HAT_Y)},
+                {e.getAxisValue(MotionEvent.AXIS_Z), e.getAxisValue(MotionEvent.AXIS_RZ)},
+                {e.getAxisValue(MotionEvent.AXIS_RX), e.getAxisValue(MotionEvent.AXIS_RY)}};
+        for (float[] p : alt)
+            if (Math.abs(p[0]) + Math.abs(p[1]) > Math.abs(x) + Math.abs(y)) { x = p[0]; y = p[1]; }
+        if (Math.max(Math.abs(x), Math.abs(y)) < 0.4f) return 0;
         if (Math.abs(x) > Math.abs(y)) return x < 0 ? LEFT : RIGHT;
         return y < 0 ? UP : DOWN;
     }
@@ -69,7 +73,8 @@ public class RemoteNav {
     static boolean isJoystick(MotionEvent e) {
         int s = e.getSource();
         return (s & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
-                || (s & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD;
+                || (s & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
+                || (s & InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD;
     }
 
     /** Joystick movement. Returns true when handled. */
@@ -87,10 +92,6 @@ public class RemoteNav {
         return true;
     }
 
-    private static boolean fromGamepad(KeyEvent e) {
-        InputDevice d = e.getDevice();
-        return d != null && (d.getSources() & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD;
-    }
 
     /** Keys: arrows / OK / Back while the highlight is shown (or from a gamepad). */
     boolean onKey(KeyEvent e) {
@@ -101,8 +102,12 @@ public class RemoteNav {
         else if (code == KeyEvent.KEYCODE_DPAD_RIGHT) dir = RIGHT;
         else if (code == KeyEvent.KEYCODE_DPAD_UP) dir = UP;
         else if (code == KeyEvent.KEYCODE_DPAD_DOWN) dir = DOWN;
-        boolean userMapped = Keys.isCustom(a, code);
-        if (dir != 0 && !userMapped && (active || fromGamepad(e))) {
+        // learned "Menu up/down/left/right" buttons
+        int act = Keys.actionFor(a, code);
+        if (act >= Keys.NAV_UP && act <= Keys.NAV_RIGHT) dir = navDir(act);
+        else if (Keys.isCustom(a, code)) dir = 0;
+        // arrow keys / joystick-as-arrows always move the menu highlight
+        if (dir != 0) {
             if (down) move(dir);
             return true;
         }
@@ -120,6 +125,29 @@ public class RemoteNav {
             return true;
         }
         return false;
+    }
+
+    static int navDir(int action) {
+        switch (action) {
+            case Keys.NAV_UP: return UP;
+            case Keys.NAV_DOWN: return DOWN;
+            case Keys.NAV_LEFT: return LEFT;
+            case Keys.NAV_RIGHT: return RIGHT;
+        }
+        return 0;
+    }
+
+    /** For Bluetooth (in-app) remotes: run a learned menu action. */
+    boolean doNav(int action) {
+        if (action == Keys.SELECT) {
+            if (active) select();
+            else start();
+            return true;
+        }
+        int d = navDir(action);
+        if (d == 0) return false;
+        move(d);
+        return true;
     }
 
     // ---------- actions ----------
@@ -153,7 +181,7 @@ public class RemoteNav {
         cur = null;
     }
 
-    private void move(int dir) {
+    void move(int dir) {
         active = true;
         if (cur == null || !cur.isShown()) {
             cur = pickDefault();

@@ -368,14 +368,23 @@ public class RemoteActivity extends Activity
 
     @Override
     public boolean dispatchGenericMotionEvent(android.view.MotionEvent ev) {
+        int src = ev.getSource();
+        String dev = ev.getDevice() != null ? ev.getDevice().getName() : "?";
         if (RemoteNav.isJoystick(ev) && ev.getActionMasked() == android.view.MotionEvent.ACTION_MOVE) {
             int d = RemoteNav.joyDir(ev);
             if (d != 0) {
                 String[] n = {"", "LEFT", "RIGHT", "UP", "DOWN"};
-                testTv.setText("Joystick: " + n[d] + "\n→  moves the menu highlight (press Select / OK to choose)");
+                testTv.setText("✅ Joystick: " + n[d] + "\n(" + dev + ")\nMenu highlight will move.");
             }
             return true;
         }
+        if ((src & android.view.InputDevice.SOURCE_CLASS_POINTER) != 0
+                || (src & android.view.InputDevice.SOURCE_MOUSE) == android.view.InputDevice.SOURCE_MOUSE) {
+            testTv.setText("⚠ Remote is in MOUSE mode\n(" + dev + ")\n"
+                    + "Switch the remote to GAME / joystick mode for menu control.");
+            return super.dispatchGenericMotionEvent(ev);
+        }
+        testTv.setText("Signal from " + dev + " (source " + src + ")");
         return super.dispatchGenericMotionEvent(ev);
     }
 
@@ -391,8 +400,12 @@ public class RemoteActivity extends Activity
                 refreshLabels();
             } else {
                 int a = Keys.actionFor(this, code);
-                testTv.setText("Button: " + Keys.keyName(code) + "\n→  "
-                        + (a == Keys.NONE ? "(no action — use Set)" : Keys.NAMES[a]));
+                boolean arrow = code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
+                        || code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT;
+                String what = arrow && !Keys.isCustom(this, code) ? "Menu move (joystick / arrow)"
+                        : (a == Keys.NONE ? "(no action — use Set)" : Keys.NAMES[a]);
+                String dev = e.getDevice() != null ? e.getDevice().getName() : "?";
+                testTv.setText("Button: " + Keys.keyName(code) + "\n→  " + what + "\n(" + dev + ")");
             }
             refreshDevices();
         }

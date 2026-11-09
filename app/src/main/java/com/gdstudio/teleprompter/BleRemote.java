@@ -35,6 +35,9 @@ import java.util.UUID;
  */
 public class BleRemote implements Application.ActivityLifecycleCallbacks {
 
+    /** Screens with remote menu navigation. */
+    interface NavHost { RemoteNav nav(); }
+
     interface RawListener {
         void onBleState(boolean connected, String text);
         void onBleRaw(String sig, int action);
@@ -260,6 +263,9 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
         main.post(() -> {
             if (rawListener != null) {
                 rawListener.onBleRaw(sig, mappedAction);
+            } else if (current instanceof NavHost && ((NavHost) current).nav() != null
+                    && ((NavHost) current).nav().doNav(action)) {
+                // menu navigation handled
             } else if (current instanceof PrompterActivity && action != Keys.NONE) {
                 ((PrompterActivity) current).doAction(action, true);
             } else if (current != null && action != Keys.NONE) {

@@ -33,7 +33,8 @@ import android.widget.TextView;
 import java.util.Locale;
 
 public class PrompterActivity extends Activity
-        implements Choreographer.FrameCallback, InputManager.InputDeviceListener, VoiceScroller.Target {
+        implements Choreographer.FrameCallback, InputManager.InputDeviceListener, VoiceScroller.Target,
+        BleRemote.NavHost {
 
     // ---- settings (saved, all live) ----
     private int fontSize, lineSp, letterSp, speed, margin, textColor, bgColor, countdown;
@@ -1089,8 +1090,17 @@ public class PrompterActivity extends Activity
                     else nav.start();
                 }
                 break;
+            case Keys.NAV_UP:
+            case Keys.NAV_DOWN:
+            case Keys.NAV_LEFT:
+            case Keys.NAV_RIGHT:
+                nav.move(RemoteNav.navDir(action));
+                break;
         }
     }
+
+    @Override
+    public RemoteNav nav() { return nav; }
 
     /** Joystick on the remote: move the menu highlight. */
     @Override

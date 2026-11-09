@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Locale;
 
 /** "My Lines" — list of all saved scripts. */
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements BleRemote.NavHost {
 
     static final String PREFS = "prompter";
     static final String K_FONT = "font";
@@ -179,7 +179,7 @@ public class MainActivity extends Activity {
         });
         devRow.addView(pic, new LinearLayout.LayoutParams(dp(30), dp(30)));
         TextView dev = new TextView(this);
-        dev.setText("GD Teleprompter  •  Developer: M. Shahariar");
+        dev.setText("GD Teleprompter  •  Created by M. Shahariar");
         dev.setTextColor(Color.rgb(140, 140, 140));
         dev.setTextSize(12);
         dev.setPadding(dp(10), 0, 0, 0);
@@ -477,12 +477,15 @@ public class MainActivity extends Activity {
     private void about() {
         new AlertDialog.Builder(this)
                 .setTitle("GD Teleprompter")
-                .setMessage("Version 5.2\n\nDeveloper: M. Shahariar\n\n"
+                .setMessage("Version 5.3\n\nCreated by M. Shahariar\n\n"
                         + "Remote (Feelworld, Bluetooth, phone), voice scroll, Bangla font, "
                         + "PAUSE markers, file import and backup.")
                 .setPositiveButton("OK", null)
                 .show();
     }
+
+    @Override
+    public RemoteNav nav() { return nav; }
 
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent e) {
