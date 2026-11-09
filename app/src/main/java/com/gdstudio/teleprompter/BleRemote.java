@@ -41,6 +41,7 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
     interface RawListener {
         void onBleState(boolean connected, String text);
         void onBleRaw(String sig, int action);
+        void onBleJoystick(String dir);
     }
 
     interface ScanCb { void found(String addr, String name); }
@@ -245,8 +246,70 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
 
     // ---------- button signals ----------
 
+    // ---------- joystick (gamepad-style report: A1 xx X Y Z RZ buttons…) ----------
+
+    private int joyHeld = 0, joyRepeats = 0;
+    private final Runnable joyRepeat = new Runnable() {
+        @Override
+        public void run() {
+            if (joyHeld == 0 || ++joyRepeats > 12) return;
+            joyMove(joyHeld, false);
+            main.postDelayed(this, 220);
+        }
+    };
+
+    private static boolean isGamepadReport(byte[] v) {
+        return v.length >= 6 && (v[0] & 0xFF) == 0xA1;
+    }
+
+    /** Direction of the stick in bytes 2 (X) and 3 (Y), centre = 0x80. 0 = centred. */
+    private static int stickDir(byte[] v) {
+        int dx = (v[2] & 0xFF) - 128, dy = (v[3] & 0xFF) - 128;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 64) return 0;
+        if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? RemoteNav.LEFT : RemoteNav.RIGHT;
+        return dy < 0 ? RemoteNav.UP : RemoteNav.DOWN;
+    }
+
+    /** Any button bits set (everything after the stick bytes). */
+    private static boolean hasButtons(byte[] v) {
+        for (int i = 6; i < v.length; i++) if (v[i] != 0) return true;
+        for (int i = 4; i < 6 && i < v.length; i++)
+            if (Math.abs((v[i] & 0xFF) - 128) > 64) return true;
+        return false;
+    }
+
+    private void onStick(int dir) {
+        if (dir == joyHeld) return;
+        joyHeld = dir;
+        joyRepeats = 0;
+        main.removeCallbacks(joyRepeat);
+        if (dir == 0) return;
+        joyMove(dir, true);
+        main.postDelayed(joyRepeat, 450);
+    }
+
+    private void joyMove(int dir, boolean first) {
+        String[] n = {"", "LEFT", "RIGHT", "UP", "DOWN"};
+        if (rawListener != null) {
+            if (first) rawListener.onBleJoystick(n[dir]);
+        } else if (current instanceof NavHost && ((NavHost) current).nav() != null) {
+            ((NavHost) current).nav().move(dir);
+        }
+    }
+
     private void handle(UUID u, byte[] v) {
         if (v == null || v.length == 0) return;
+        if (isGamepadReport(v)) {
+            final int dir = stickDir(v);
+            main.post(() -> onStick(dir));
+            if (!hasButtons(v)) {
+                lastSig = "";
+                return; // only the stick moved
+            }
+            // button pressed: ignore the stick position so the button is always recognised
+            v = v.clone();
+            for (int i = 2; i < 6; i++) v[i] = (byte) 0x80;
+        }
         boolean allZero = true;
         for (byte b : v) if (b != 0) { allZero = false; break; }
         if (allZero) return; // button release
@@ -259,7 +322,11 @@ public class BleRemote implements Application.ActivityLifecycleCallbacks {
         lastTime = now;
         int mappedAction = actionFor(sig);
         // nothing learned yet: any remote button = Play/Pause, so it works right away
-        int action = (mappedAction == Keys.NONE && !hasAnyMap()) ? Keys.PLAY : mappedAction;
+        int act0 = (mappedAction == Keys.NONE && !hasAnyMap()) ? Keys.PLAY : mappedAction;
+        // while the menu highlight is shown, an unset button (e.g. joystick press) = Select
+        if (mappedAction == Keys.NONE && current instanceof NavHost && ((NavHost) current).nav() != null
+                && ((NavHost) current).nav().isActive()) act0 = Keys.SELECT;
+        final int action = act0;
         main.post(() -> {
             if (rawListener != null) {
                 rawListener.onBleRaw(sig, mappedAction);

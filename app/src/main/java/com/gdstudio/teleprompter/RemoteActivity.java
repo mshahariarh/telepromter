@@ -255,6 +255,12 @@ public class RemoteActivity extends Activity
     }
 
     @Override
+    public void onBleJoystick(String dir) {
+        testTv.setText("✅ Joystick: " + dir + "\nMenu highlight will move.\n"
+                + "Press the joystick (or any unset button) to select.");
+    }
+
+    @Override
     public void onBleRaw(String sig, int action) {
         if (learning > 0) {
             ble.assign(learning, sig);

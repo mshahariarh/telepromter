@@ -84,7 +84,7 @@ public class SplashActivity extends Activity {
 
         root.addView(box);
 
-        TextView ver = text("Version 5.3", 12, Color.rgb(100, 105, 120), false);
+        TextView ver = text("Version 5.4", 12, Color.rgb(100, 105, 120), false);
         ver.setPadding(0, dp(40), 0, 0);
         root.addView(ver);
 

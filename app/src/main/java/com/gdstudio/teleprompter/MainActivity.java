@@ -477,7 +477,7 @@ public class MainActivity extends Activity implements BleRemote.NavHost {
     private void about() {
         new AlertDialog.Builder(this)
                 .setTitle("GD Teleprompter")
-                .setMessage("Version 5.3\n\nCreated by M. Shahariar\n\n"
+                .setMessage("Version 5.4\n\nCreated by M. Shahariar\n\n"
                         + "Remote (Feelworld, Bluetooth, phone), voice scroll, Bangla font, "
                         + "PAUSE markers, file import and backup.")
                 .setPositiveButton("OK", null)
